@@ -15,7 +15,7 @@ import {
   CartesianGrid,
   Legend
 } from "recharts";
-
+const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#14b8a6"];
 function App() {
   const [file, setFile] = useState(null);
   const [data, setData] = useState(null);
@@ -116,35 +116,36 @@ function App() {
               </div>
             </div>
           )}
-          {/* 🥧 PIE CHART */}
+         {/* 🥧 PIE CHART */}
 <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-  <h3 className="text-xl font-bold text-gray-900 mb-4">
-    Category Distribution
-  </h3>
-
+  <h3 className="text-xl font-bold text-gray-900 mb-4">Category Distribution</h3>
   <div className="w-full h-80">
     <ResponsiveContainer width="100%" height="100%">
-      <PieChart>
-        <Pie
-          data={data.chart_data}
-          dataKey={data.y_key}
-          nameKey={data.x_key}
-          outerRadius={120}
-          fill="#000000"
-          label
-        >
-          {data.chart_data.map((entry, index) => (
-            <Cell key={`cell-${index}`} />
-          ))}
-        </Pie>
-
-        <Tooltip />
-        <Legend />
-      </PieChart>
-    </ResponsiveContainer>
+  <PieChart>
+    <Pie
+      data={data.chart_data}
+      dataKey={data.y_key}
+      nameKey={data.x_key}
+      outerRadius={120}
+      label
+    >
+      {data.chart_data && data.chart_data.map((entry, index) => {
+        // Direct inline array declaration to avoid reference bugs
+        const sliceColors = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#14b8a6"];
+        return (
+          <Cell 
+            key={`cell-${index}`} 
+            fill={sliceColors[index % sliceColors.length]} 
+          />
+        );
+      })}
+    </Pie>
+    <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }} />
+    <Legend iconType="circle" layout="horizontal" verticalAlign="bottom" align="center" />
+  </PieChart>
+</ResponsiveContainer>
   </div>
 </div>
-
           {/* 📋 SECTION 3: DETECTED COLUMNS TAGS */}
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
             <h3 className="text-xl font-bold text-gray-900 mb-3">Schema Map ({data.columns.length} Fields)</h3>
