@@ -1,6 +1,20 @@
 import { useState } from "react";
 import axios from "axios";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import {
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+  Legend
+} from "recharts";
 
 function App() {
   const [file, setFile] = useState(null);
@@ -102,6 +116,34 @@ function App() {
               </div>
             </div>
           )}
+          {/* 🥧 PIE CHART */}
+<div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+  <h3 className="text-xl font-bold text-gray-900 mb-4">
+    Category Distribution
+  </h3>
+
+  <div className="w-full h-80">
+    <ResponsiveContainer width="100%" height="100%">
+      <PieChart>
+        <Pie
+          data={data.chart_data}
+          dataKey={data.y_key}
+          nameKey={data.x_key}
+          outerRadius={120}
+          fill="#000000"
+          label
+        >
+          {data.chart_data.map((entry, index) => (
+            <Cell key={`cell-${index}`} />
+          ))}
+        </Pie>
+
+        <Tooltip />
+        <Legend />
+      </PieChart>
+    </ResponsiveContainer>
+  </div>
+</div>
 
           {/* 📋 SECTION 3: DETECTED COLUMNS TAGS */}
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
