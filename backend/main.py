@@ -3,6 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
 import numpy as np
 import collections
+import os
+from openai import OpenAI
 
 app = FastAPI()
 
@@ -21,6 +23,7 @@ storage = collections.defaultdict(dict)
 def home():
     return {"message": "Backend Running Successfully"}
 
+# ✅ 1. FILE UPLOAD ENDPOINT (Yeh missing tha aapki file mein!)
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
     filename_lower = file.filename.lower()
@@ -64,7 +67,7 @@ async def upload_file(file: UploadFile = File(...)):
         else:
             chart_data = df[[target_col]].reset_index().to_dict(orient="records")
 
-    # [NEW] Chat engine ke liye dataset memory mein store kar rahe hain
+    # Chat engine ke liye dataset memory mein store kar rahe hain
     storage["current_df"] = {
         "columns": columns,
         "total_rows": total_rows,
@@ -84,7 +87,7 @@ async def upload_file(file: UploadFile = File(...)):
         "y_key": target_col if numeric_cols else ""
     }
 
-# [NEW ENDPOINT] Yeh chat request handle karega
+# ✅ 2. INTERACTIVE CHAT COPILOT ENDPOINT
 @app.post("/chat")
 async def chat_with_data(message: str = Form(...)):
     df_info = storage.get("current_df")
@@ -92,11 +95,43 @@ async def chat_with_data(message: str = Form(...)):
         return {"reply": "Please upload a data file first so I can analyze its parameters!"}
     
     msg_lower = message.lower()
+    api_key = os.getenv("OPENAI_API_KEY")
     
-    # Smart Local Autonomous Fallback Logic
-    if "column" in msg_lower or "field" in msg_lower or "structure" in msg_lower:
-        return {"reply": f"Your dataset contains {len(df_info['columns'])} key attributes: {', '.join(df_info['columns'])}."}
-    elif "summary" in msg_lower or "analyze" in msg_lower or "report" in msg_lower:
-        return {"reply": f"Data Profiling Complete! The dataset contains {df_info['total_rows']} total recorded rows. The metrics map cleanly across categorical items with clear distributions shown in your visual matrices."}
+    # 🌟 IF API KEY IS VALID, CONNECT TO REAL LLM PORTS
+    if api_key and not api_key.startswith("your_"):
+        try:
+            client = OpenAI(api_key=api_key)
+            prompt = f"""
+            You are an expert corporate Business Intelligence Dashboard AI.
+            The user has uploaded a file with these attributes: {df_info['columns']}.
+            Total rows detected: {df_info['total_rows']}.
+            Sample metrics snapshot: {df_info['preview_summary']}
+            
+            User message: {message}
+            Respond briefly, crisply, and professionally like a data expert.
+            """
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}]
+            )
+            return {"reply": response.choices[0].message.content}
+        except Exception as e:
+            return {"reply": f"AI Routing error: {str(e)}"}
+            
+   # 🧠 LOCAL INTELLIGENT ROUTER (With Rows Support)
     else:
-        return {"reply": f"I see your query about '{message}'. The underlying infrastructure is ready to process this semantic layer. Once your enterprise LLM keys are configured, full contextual intelligence will execute here!"}
+        if "what can i ask" in msg_lower or "help" in msg_lower:
+            return {
+                "reply": f"You can ask me semantic queries about the indexed schema! Since your sheet contains fields like {', '.join(df_info['columns'][:3])}, you can try asking: \n"
+                         f"1. 'Give me a structural summary of the columns'\n"
+                         f"2. 'Analyze the total row distribution recorded'"
+            }
+        elif "column" in msg_lower or "field" in msg_lower or "structure" in msg_lower:
+            return {"reply": f"Your data layout maps across {len(df_info['columns'])} properties: {', '.join(df_info['columns'])}."}
+        elif "row" in msg_lower or "data" in msg_lower or "preview" in msg_lower:
+            # 🌟 Return the actual rows snapshot directly from storage memory!
+            return {"reply": f"Here is the preview snapshot of your dataset rows: {df_info['preview_summary']}"}
+        elif "summary" in msg_lower or "analyze" in msg_lower or "report" in msg_lower:
+            return {"reply": f"Data Profiling Report: File contains {df_info['total_rows']} transactional rows. The categorical breakdowns are synchronized live with your chart vectors!"}
+        else:
+            return {"reply": f"Received query: '{message}'. To unlock deep human-like analytics on your '{df_info['columns'][0]}' fields, paste your token inside the backend/.env pipeline!"}
