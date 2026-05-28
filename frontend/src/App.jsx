@@ -1,6 +1,20 @@
 import { useState } from "react";
 import axios from "axios";
-import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
+import {
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+  Legend
+} from "recharts";
 
 function App() {
   const [file, setFile] = useState(null);
@@ -168,7 +182,7 @@ function App() {
                 </>
               )}
             </div>
-
+          
             {/* RIGHT 1 COLUMN: INTERACTIVE SIDEBAR CHATBOX PANEL */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col h-[680px] overflow-hidden">
               <div className="p-4 border-b border-gray-100 bg-gray-50/50">
@@ -217,6 +231,55 @@ function App() {
             </div>
 
           </div>
+            {/* LINE CHART */}
+<div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+  <h3 className="text-xl font-bold text-gray-900 mb-2">
+    Analytics Trend Overview
+  </h3>
+
+  <p className="text-sm text-gray-400 mb-6">
+    Trend visualization across grouped dataset values
+  </p>
+
+  <div className="w-full h-72">
+    <ResponsiveContainer width="100%" height="100%">
+      <LineChart data={data.chart_data}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+
+        <XAxis
+          dataKey={data.x_key}
+          tickLine={false}
+          stroke="#9ca3af"
+        />
+
+        <YAxis
+          tickLine={false}
+          stroke="#9ca3af"
+        />
+
+        <Tooltip
+          contentStyle={{
+            borderRadius: "12px",
+            border: "none",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.05)"
+          }}
+        />
+
+        <Legend />
+
+        <Line
+          type="monotone"
+          dataKey={data.y_key}
+          stroke="#3b82f6"
+          strokeWidth={3}
+          dot={{ r: 4 }}
+          activeDot={{ r: 6 }}
+        />
+      </LineChart>
+    </ResponsiveContainer>
+  </div>
+</div>
+
 
           {/* SCHEMA MAP & EXPLORER */}
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
