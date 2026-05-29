@@ -20,6 +20,7 @@ function App() {
   const [file, setFile] = useState(null);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
   
   // Chat Sidebar States
   const [query, setQuery] = useState("");
@@ -76,12 +77,32 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-800 p-6 md:p-10">
+    <div className={`min-h-screen p-6 md:p-10 transition-all duration-300 ${
+  darkMode
+    ? "bg-gray-900 text-white"
+    : "bg-gray-50 text-gray-800"
+}`}>
       {/* Header Banner */}
-      <div className="max-w-7xl mx-auto mb-8">
-        <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight">InsightBI Engine</h1>
-        <p className="text-gray-500 mt-1">Automated Data Profiling & Business Intelligence Console</p>
-      </div>
+<div className="max-w-7xl mx-auto mb-8">
+  <h1 className={`text-4xl font-extrabold tracking-tight ${
+  darkMode ? "text-white" : "text-gray-900"
+}`}>
+  Data Analysis Platform
+</h1>
+
+<p className={`mt-1 ${
+  darkMode ? "text-gray-300" : "text-gray-500"
+}`}>
+  Interactive Analytics Dashboard & AI-Powered Data Visualization
+</p>
+
+  <button
+    onClick={() => setDarkMode(!darkMode)}
+    className="mt-4 px-4 py-2 rounded-xl bg-black text-white text-sm font-medium hover:bg-gray-800 transition"
+  >
+    {darkMode ? "☀️ Light Mode" : "🌙 Dark Mode"}
+  </button>
+</div>
 
       {/* Upload Panel */}
       <div className="max-w-7xl mx-auto bg-white p-6 rounded-2xl shadow-sm border border-gray-100 mb-8">
