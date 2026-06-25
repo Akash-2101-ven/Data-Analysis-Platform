@@ -27,7 +27,7 @@ def home():
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
     filename_lower = file.filename.lower()
-    
+
     try:
         if filename_lower.endswith(".csv") or filename_lower.endswith(".txt"):
             df = pd.read_csv(file.file)
@@ -38,36 +38,84 @@ async def upload_file(file: UploadFile = File(...)):
                 df = pd.read_csv(file.file)
             except Exception:
                 df = pd.read_excel(file.file)
+
     except Exception as e:
         return {"error": f"Failed to parse file structure: {str(e)}"}
 
     df = df.replace({np.nan: None})
+
     columns = list(df.columns)
     total_rows = len(df)
-    
-    numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-    categorical_cols = df.select_dtypes(include=['object']).columns.tolist()
 
-    kpis = {}
+    numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+    categorical_cols = df.select_dtypes(include=["object"]).columns.tolist()
+
+    # Ignore ID / Serial columns
+    numeric_cols = [
+        col for col in numeric_cols
+        if col.lower() not in ["s.no", "sno", "serial", "serial_no", "id"]
+    ]
+
+    # ==========================
+    # OVERVIEW KPIs
+    # ==========================
+    overview_kpis = {
+        "total_rows": total_rows,
+        "total_columns": len(columns),
+        "numeric_columns": len(numeric_cols),
+        "missing_values": int(df.isnull().sum().sum())
+    }
+
+    # ==========================
+    # COLUMN KPIs
+    # ==========================
+    column_kpis = {}
+
+    for col in numeric_cols:
+        try:
+            column_kpis[col] = {
+                "sum": round(float(df[col].sum()), 2),
+                "average": round(float(df[col].mean()), 2),
+                "max": round(float(df[col].max()), 2),
+                "min": round(float(df[col].min()), 2)
+            }
+        except Exception:
+            pass
+
+    # ==========================
+    # CHART DATA
+    # ==========================
     chart_data = []
+    target_col = ""
 
     if numeric_cols:
         target_col = numeric_cols[0]
-        kpis = {
-            "target_column": target_col,
-            "total": float(df[target_col].sum()) if df[target_col].sum() else 0,
-            "average": float(df[target_col].mean()) if df[target_col].mean() else 0,
-            "max": float(df[target_col].max()) if df[target_col].max() else 0
-        }
-        
+
         if categorical_cols:
             x_axis = categorical_cols[0]
-            grouped = df.groupby(x_axis)[target_col].sum().reset_index()
-            chart_data = grouped.to_dict(orient="records")
-        else:
-            chart_data = df[[target_col]].reset_index().to_dict(orient="records")
 
-    # Chat engine ke liye dataset memory mein store kar rahe hain
+            try:
+                grouped = (
+                    df.groupby(x_axis)[target_col]
+                    .sum()
+                    .reset_index()
+                )
+
+                chart_data = grouped.to_dict(orient="records")
+
+            except Exception:
+                chart_data = []
+
+        else:
+            chart_data = (
+                df[[target_col]]
+                .reset_index()
+                .to_dict(orient="records")
+            )
+
+    # ==========================
+    # STORE DATASET INFO FOR CHAT
+    # ==========================
     storage["current_df"] = {
         "columns": columns,
         "total_rows": total_rows,
@@ -81,12 +129,14 @@ async def upload_file(file: UploadFile = File(...)):
         "columns": columns,
         "total_rows": total_rows,
         "preview": preview_data,
-        "kpis": kpis,
+
+        "overview_kpis": overview_kpis,
+        "column_kpis": column_kpis,
+
         "chart_data": chart_data,
         "x_key": categorical_cols[0] if categorical_cols else "index",
-        "y_key": target_col if numeric_cols else ""
+        "y_key": target_col
     }
-
 # ✅ 2. INTERACTIVE CHAT COPILOT ENDPOINT
 @app.post("/chat")
 async def chat_with_data(message: str = Form(...)):

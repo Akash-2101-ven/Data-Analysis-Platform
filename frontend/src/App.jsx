@@ -124,34 +124,92 @@ function App() {
 
       {data && (
         <div className="max-w-7xl mx-auto space-y-8">
-          
-          {/* 📈 EXECUTIVE SUMMARY KPI CARDS */}
-          <div>
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Executive Summary</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
-                <p className="text-sm font-medium text-gray-400 uppercase tracking-wider">Total Records</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{data.total_rows} Rows</p>
-              </div>
-              {data.kpis.target_column && (
-                <>
-                  <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
-                    <p className="text-sm font-medium text-gray-400 uppercase tracking-wider">Total {data.kpis.target_column}</p>
-                    <p className="text-2xl font-bold text-emerald-600 mt-1">{data.kpis.total.toLocaleString()}</p>
-                  </div>
-                  <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
-                    <p className="text-sm font-medium text-gray-400 uppercase tracking-wider">Average {data.kpis.target_column}</p>
-                    <p className="text-2xl font-bold text-blue-600 mt-1">{data.kpis.average.toFixed(1)}</p>
-                  </div>
-                  <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
-                    <p className="text-sm font-medium text-gray-400 uppercase tracking-wider">Peak {data.kpis.target_column}</p>
-                    <p className="text-2xl font-bold text-purple-600 mt-1">{data.kpis.max.toLocaleString()}</p>
-                  </div>
-                </>
-              )}
-            </div>
+
+{/* 📈 EXECUTIVE SUMMARY KPI CARDS */}
+<div>
+  <h2 className="text-xl font-bold text-gray-900 mb-4">
+    Executive Summary
+  </h2>
+
+  {/* Overview KPIs */}
+  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+      <p className="text-sm font-medium text-gray-400 uppercase">
+        Total Records
+      </p>
+      <p className="text-2xl font-bold text-gray-900 mt-1">
+        {data.overview_kpis?.total_rows}
+      </p>
+    </div>
+
+    <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+      <p className="text-sm font-medium text-gray-400 uppercase">
+        Total Columns
+      </p>
+      <p className="text-2xl font-bold text-blue-600 mt-1">
+        {data.overview_kpis?.total_columns}
+      </p>
+    </div>
+
+    <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+      <p className="text-sm font-medium text-gray-400 uppercase">
+        Numeric Columns
+      </p>
+      <p className="text-2xl font-bold text-green-600 mt-1">
+        {data.overview_kpis?.numeric_columns}
+      </p>
+    </div>
+
+    <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+      <p className="text-sm font-medium text-gray-400 uppercase">
+        Missing Values
+      </p>
+      <p className="text-2xl font-bold text-red-600 mt-1">
+        {data.overview_kpis?.missing_values}
+      </p>
+    </div>
+  </div>
+
+  {/* Column KPIs */}
+  {data.column_kpis &&
+    Object.entries(data.column_kpis).map(([column, stats]) => (
+      <div key={column} className="mb-6">
+        <h3 className="text-lg font-semibold mb-3">
+          {column} Analytics
+        </h3>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+            <p className="text-sm text-gray-400 uppercase">Sum</p>
+            <p className="text-xl font-bold text-emerald-600">
+              {stats.sum.toLocaleString()}
+            </p>
           </div>
 
+          <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+            <p className="text-sm text-gray-400 uppercase">Average</p>
+            <p className="text-xl font-bold text-blue-600">
+              {stats.average.toLocaleString()}
+            </p>
+          </div>
+
+          <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+            <p className="text-sm text-gray-400 uppercase">Maximum</p>
+            <p className="text-xl font-bold text-purple-600">
+              {stats.max.toLocaleString()}
+            </p>
+          </div>
+
+          <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+            <p className="text-sm text-gray-400 uppercase">Minimum</p>
+            <p className="text-xl font-bold text-orange-600">
+              {stats.min.toLocaleString()}
+            </p>
+          </div>
+        </div>
+      </div>
+    ))}
+</div>
           {/* 💬 LAYOUT WORKSPACE: CHARTS (LEFT) + CHATBOX (RIGHT) */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             
