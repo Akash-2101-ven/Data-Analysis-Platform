@@ -1,6 +1,59 @@
-import React from "react";
+import React, { useState } from "react";
+import { signInWithPopup, signInWithEmailAndPassword } from "firebase/auth";
+import { Link } from "react-router-dom";
+import { auth, provider } from "../firebase";
+import { useNavigate } from "react-router-dom";
 
 const Login = () => {
+  // ✅ STATE
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const navigate = useNavigate();
+
+  // 🔐 EMAIL/PASSWORD LOGIN
+  const handleLogin = async () => {
+    try {
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+
+      console.log("Login Success:", userCredential.user);
+
+      localStorage.setItem(
+        "user",
+        JSON.stringify(userCredential.user)
+      );
+
+      alert("Login Successful");
+
+      navigate("/dashboard"); // ✅ FIXED
+    } catch (error) {
+      console.log(error);
+      alert(error.message);
+    }
+  };
+
+  // 🌐 GOOGLE LOGIN
+  const handleGoogleLogin = async () => {
+    try {
+      const result = await signInWithPopup(auth, provider);
+
+      console.log("User:", result.user);
+
+      localStorage.setItem("user", JSON.stringify(result.user));
+
+      alert("Login Successful");
+
+      navigate("/dashboard"); // ❌ FIXED (no window.location)
+    } catch (error) {
+      console.log(error);
+      alert(error.code + " : " + error.message);
+    }
+  };
+
   return (
     <div
       style={{
@@ -25,9 +78,11 @@ const Login = () => {
 
         <p>Welcome Back 👋</p>
 
+        {/* EMAIL */}
         <input
           type="email"
           placeholder="Email"
+          onChange={(e) => setEmail(e.target.value)}
           style={{
             width: "100%",
             padding: "10px",
@@ -37,9 +92,11 @@ const Login = () => {
           }}
         />
 
+        {/* PASSWORD */}
         <input
           type="password"
           placeholder="Password"
+          onChange={(e) => setPassword(e.target.value)}
           style={{
             width: "100%",
             padding: "10px",
@@ -49,7 +106,9 @@ const Login = () => {
           }}
         />
 
+        {/* LOGIN BUTTON */}
         <button
+          onClick={handleLogin}
           style={{
             width: "100%",
             padding: "12px",
@@ -64,7 +123,9 @@ const Login = () => {
           Login
         </button>
 
+        {/* GOOGLE LOGIN */}
         <button
+          onClick={handleGoogleLogin}
           style={{
             width: "100%",
             padding: "12px",
@@ -78,6 +139,18 @@ const Login = () => {
         >
           Continue with Google
         </button>
+        <p style={{ marginTop: "20px", color: "white" }}>
+  Don't have an account?{" "}
+  <Link
+    to="/register"
+    style={{
+      color: "#60a5fa",
+      textDecoration: "none",
+    }}
+  >
+    Create Account
+  </Link>
+</p>
       </div>
     </div>
   );
