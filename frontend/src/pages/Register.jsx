@@ -33,12 +33,12 @@ const Register = () => {
         displayName: name,
       });
 
-      alert("Account Created Successfully");
+      ("Account Created Successfully");
 
       navigate("/");
-    } catch (error) {
+    }catch (error) {
       console.log(error);
-      alert(error.message);
+      alert(error.code + "\n\n" + error.message);
     }
   };
 

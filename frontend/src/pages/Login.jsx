@@ -27,7 +27,7 @@ const Login = () => {
         JSON.stringify(userCredential.user)
       );
 
-      alert("Login Successful");
+      ("Login Successful");
 
       navigate("/dashboard"); // ✅ FIXED
     } catch (error) {
