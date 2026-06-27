@@ -22,10 +22,6 @@ const Login = () => {
 
       console.log("Login Success:", userCredential.user);
 
-      localStorage.setItem(
-        "user",
-        JSON.stringify(userCredential.user)
-      );
 
       ("Login Successful");
 
@@ -43,7 +39,6 @@ const Login = () => {
 
       console.log("User:", result.user);
 
-      localStorage.setItem("user", JSON.stringify(result.user));
 
       alert("Login Successful");
 

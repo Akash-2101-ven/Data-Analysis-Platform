@@ -1,4 +1,7 @@
 import Login from "./pages/Login";
+import { signOut } from "firebase/auth";
+import { auth } from "./firebase";
+import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import axios from "axios";
 import {
@@ -55,6 +58,19 @@ function App() {
     }
   };
 
+  const navigate = useNavigate();
+
+const handleLogout = async () => {
+  try {
+    await signOut(auth);
+
+    navigate("/");
+
+  } catch (error) {
+    console.log(error);
+  }
+};
+
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!query.trim()) return;
@@ -104,6 +120,12 @@ function App() {
   >
     {darkMode ? "☀️ Light Mode" : "🌙 Dark Mode"}
   </button>
+  <button
+  onClick={handleLogout}
+  className="ml-3 px-4 py-2 rounded-xl bg-red-600 text-white hover:bg-red-700"
+>
+  Logout
+</button>
 </div>
 
       {/* Upload Panel */}
