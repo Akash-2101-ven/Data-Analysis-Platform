@@ -29,8 +29,7 @@ const Login = () => {
       alert(error.message);
     }
   };
-
-  // 🌐 GOOGLE LOGIN
+    // 🌐 GOOGLE LOGIN
   const handleGoogleLogin = async () => {
     try {
       const result = await signInWithPopup(auth, provider);
@@ -148,6 +147,26 @@ border: "1px solid #334155",
   boxSizing: "border-box",
 }}
         />
+
+          <p
+  style={{
+    textAlign: "right",
+    marginTop: "10px",
+    fontSize: "14px",
+  }}
+>
+  <Link
+    to="/forgot-password"
+    style={{
+      color: "#60a5fa",
+      textDecoration: "none",
+      fontWeight: "600",
+    }}
+  >
+    Forgot Password?
+  </Link>
+</p>
+
 
         {/* LOGIN BUTTON */}
         <button
