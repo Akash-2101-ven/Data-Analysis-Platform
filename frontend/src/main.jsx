@@ -10,16 +10,29 @@ import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
 import ForgotPassword from "./pages/ForgotPassword.jsx";
 import ProtectedRoute from "./components/ProtectedRoute";
+import LandingPage from "./pages/LandingPage";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <AuthProvider>
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Login />} />
-        <Route path="/dashboard" element={<ProtectedRoute> <App /> </ProtectedRoute>} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/" element={<LandingPage />} />
+
+<Route path="/login" element={<Login />} />
+
+<Route
+  path="/dashboard"
+  element={
+    <ProtectedRoute>
+      <App />
+    </ProtectedRoute>
+  }
+/>
+
+<Route path="/register" element={<Register />} />
+
+<Route path="/forgot-password" element={<ForgotPassword />} />  
       </Routes>
     </BrowserRouter>
     </AuthProvider>
