@@ -26,14 +26,13 @@ function App() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
-  
+  const user = auth.currentUser;
   // Chat Sidebar States
   const [query, setQuery] = useState("");
   const [chatHistory, setChatHistory] = useState([
     { role: "assistant", text: "Hello! Upload a data file and ask me anything about your metrics." }
   ]);
   const [chatLoading, setChatLoading] = useState(false);
-
   const uploadFile = async () => {
     if (!file) {
       alert("Please select a file first!");
@@ -100,34 +99,70 @@ const handleLogout = async () => {
     ? "bg-gray-900 text-white"
     : "bg-gray-50 text-gray-800"
 }`}>
-      {/* Header Banner */}
-<div className="max-w-7xl mx-auto mb-8">
-  <h1 className={`text-4xl font-extrabold tracking-tight ${
-  darkMode ? "text-white" : "text-gray-900"
-}`}>
-  Data Analysis Platform
-</h1>
+  {/* Header Banner */}
+<div className="max-w-7xl mx-auto mb-8 flex justify-between items-start">
 
-<p className={`mt-1 ${
-  darkMode ? "text-gray-300" : "text-gray-500"
-}`}>
-  Interactive Analytics Dashboard & AI-Powered Data Visualization
-</p>
+  {/* Left Side */}
+  <div>
+    <h1
+      className={`text-4xl font-extrabold tracking-tight ${
+        darkMode ? "text-white" : "text-gray-900"
+      }`}
+    >
+      📊 Data Analysis Platform
+    </h1>
 
-  <button
-    onClick={() => setDarkMode(!darkMode)}
-    className="mt-4 px-4 py-2 rounded-xl bg-black text-white text-sm font-medium hover:bg-gray-800 transition"
-  >
-    {darkMode ? "☀️ Light Mode" : "🌙 Dark Mode"}
-  </button>
-  <button
-  onClick={handleLogout}
-  className="ml-3 px-4 py-2 rounded-xl bg-red-600 text-white hover:bg-red-700"
+    <p
+      className={`mt-2 ${
+        darkMode ? "text-gray-300" : "text-gray-500"
+      }`}
+    >
+      Interactive Analytics Dashboard & AI-Powered Data Visualization
+    </p>
+
+    <button
+      onClick={() => setDarkMode(!darkMode)}
+      className="mt-4 px-4 py-2 rounded-xl bg-black text-white text-sm font-medium hover:bg-gray-800 transition"
+    >
+      {darkMode ? "☀️ Light Mode" : "🌙 Dark Mode"}
+    </button>
+  </div>
+
+  {/* Right Side */}
+ <div
+  className={`rounded-2xl p-5 shadow-lg border ${
+    darkMode
+      ? "bg-gray-800 border-gray-700"
+      : "bg-white border-gray-200"
+  } w-72`}
 >
-  Logout
-</button>
-</div>
+  <div className="flex items-center gap-4">
 
+    <div className="w-14 h-14 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xl font-bold shadow-md">
+      {(user?.displayName || user?.email)
+        ?.charAt(0)
+        .toUpperCase()}
+    </div>
+
+    <div className="overflow-hidden">
+      <h3 className="font-bold text-lg truncate">
+        {user?.displayName || user?.email?.split("@")[0]}
+      </h3>
+
+      <p className="text-sm text-gray-500 truncate">
+        {user?.email}
+      </p>
+    </div>
+  </div>
+
+  <button
+    onClick={handleLogout}
+    className="mt-5 w-full bg-red-500 hover:bg-red-600 text-white py-2.5 rounded-xl font-medium transition-all"
+  >
+    Logout
+  </button>
+</div> 
+</div>
       {/* Upload Panel */}
       <div className="max-w-7xl mx-auto bg-white p-6 rounded-2xl shadow-sm border border-gray-100 mb-8">
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
