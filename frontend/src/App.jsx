@@ -186,9 +186,13 @@ const handleLogout = async () => {
 
 {/* 📈 EXECUTIVE SUMMARY KPI CARDS */}
 <div>
-  <h2 className="text-xl font-bold text-gray-900 mb-4">
-    Executive Summary
-  </h2>
+  <h2
+  className={`text-xl font-bold mb-4 ${
+    darkMode ? "text-white" : "text-gray-900"
+  }`}
+>
+  Executive Summary
+</h2>
 
   {/* Overview KPIs */}
   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
