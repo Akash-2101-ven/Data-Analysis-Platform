@@ -25,6 +25,10 @@ function App() {
   const [file, setFile] = useState(null);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [selectedX, setSelectedX] = useState("");
+const [selectedY, setSelectedY] = useState("");
+const [chartType, setChartType] = useState("Bar");
+const [aggregation, setAggregation] = useState("Sum");
   const [darkMode, setDarkMode] = useState(false);
   const user = auth.currentUser;
   // Chat Sidebar States
@@ -38,14 +42,19 @@ function App() {
       alert("Please select a file first!");
       return;
     }
-
     const formData = new FormData();
-    formData.append("file", file);
+
+formData.append("file", file);
+formData.append("x_axis", selectedX);
+formData.append("y_axis", selectedY);
+formData.append("aggregation", aggregation);
     setLoading(true);
 
     try {
       const response = await axios.post("http://127.0.0.1:8000/upload", formData);
       setData(response.data);
+      setSelectedX(response.data.x_key);
+setSelectedY(response.data.y_key);
       setChatHistory([
         { role: "assistant", text: `Successfully indexed ${response.data.filename}! Ask me any questions about these fields.` }
       ]);
@@ -180,6 +189,82 @@ const handleLogout = async () => {
           </button>
         </div>
       </div>
+
+   {data && (
+<div
+  className={`max-w-7xl mx-auto rounded-2xl shadow-sm border p-6 mb-8 ${
+    darkMode
+      ? "bg-gray-800 border-gray-700 text-white"
+      : "bg-white border-gray-100 text-gray-900"
+  }`}
+>
+
+    <h2 className="text-xl font-bold mb-5">
+      Visualization Settings
+    </h2>
+
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+      {/* X Axis */}
+      <div>
+        <label className="block mb-2 font-medium">
+          X Axis
+        </label>
+
+        <select
+          value={selectedX}
+          onChange={(e) => setSelectedX(e.target.value)}
+          className="w-full border rounded-lg p-2"
+        >
+          {data.columns.map((col) => (
+            <option key={col} value={col}>
+              {col}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Y Axis */}
+      <div>
+        <label className="block mb-2 font-medium">
+          Y Axis
+        </label>
+
+        <select
+          value={selectedY}
+          onChange={(e) => setSelectedY(e.target.value)}
+          className="w-full border rounded-lg p-2"
+        >
+          {data.columns.map((col) => (
+            <option key={col} value={col}>
+              {col}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Aggregation */}
+      <div>
+        <label className="block mb-2 font-medium">
+          Aggregation
+        </label>
+
+        <select
+          value={aggregation}
+          onChange={(e) => setAggregation(e.target.value)}
+          className="w-full border rounded-lg p-2"
+        >
+          <option value="sum">Sum</option>
+          <option value="mean">Average</option>
+          <option value="max">Maximum</option>
+          <option value="min">Minimum</option>
+        </select>
+      </div>
+
+    </div>
+
+  </div>
+)}   
 
       {data && (
         <div className="max-w-7xl mx-auto space-y-8">

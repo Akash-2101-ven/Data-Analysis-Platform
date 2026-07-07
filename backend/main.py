@@ -25,7 +25,12 @@ def home():
 
 # ✅ 1. FILE UPLOAD ENDPOINT (Yeh missing tha aapki file mein!)
 @app.post("/upload")
-async def upload_file(file: UploadFile = File(...)):
+async def upload_file(
+    file: UploadFile = File(...),
+    x_axis: str = Form(None),
+    y_axis: str = Form(None),
+    aggregation: str = Form("sum")
+):
     filename_lower = file.filename.lower()
 
     try:
