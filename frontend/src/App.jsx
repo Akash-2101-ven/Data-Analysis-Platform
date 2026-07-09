@@ -45,13 +45,14 @@ const [aggregation, setAggregation] = useState("Sum");
     const formData = new FormData();
 
 formData.append("file", file);
-formData.append("x_axis", selectedX);
-formData.append("y_axis", selectedY);
+if(selectedX) formData.append("x_axis", selectedX);
+if(selectedY) formData.append("y_axis", selectedY);
 formData.append("aggregation", aggregation);
     setLoading(true);
 
     try {
       const response = await axios.post("http://127.0.0.1:8000/upload", formData);
+      console.log(response.data);
       setData(response.data);
       setSelectedX(response.data.x_key);
 setSelectedY(response.data.y_key);
@@ -187,6 +188,12 @@ const handleLogout = async () => {
           >
             {loading ? "Processing..." : "Generate Dashboard"}
           </button>
+          <button
+  onClick={uploadFile}
+  className="bg-blue-500 text-white px-4 py-2 rounded-lg mt-4"
+>
+    Update Visualization
+</button>
         </div>
       </div>
 
@@ -365,6 +372,11 @@ const handleLogout = async () => {
             <div className="lg:col-span-2 space-y-8">
               {data.chart_data && data.chart_data.length > 0 && (
                 <>
+                <div className="bg-red-100 p-4 rounded mb-4 text-black">
+                  <p>X Key: {data.x_key}</p>
+                  <p>Y Key: {data.y_key}</p>
+                  <p>Chart Length: {data.chart_data.length}</p>
+                 </div>
                   {/* BAR CHART */}
                   <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                     <h3 className="text-xl font-bold text-gray-900 mb-2">Automated Data Distribution</h3>

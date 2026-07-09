@@ -48,7 +48,7 @@ async def upload_file(
         return {"error": f"Failed to parse file structure: {str(e)}"}
 
     df = df.replace({np.nan: None})
-
+    df.columns = df.columns.str.strip()
     columns = list(df.columns)
     total_rows = len(df)
 
@@ -91,33 +91,46 @@ async def upload_file(
     # CHART DATA
     # ==========================
     chart_data = []
-    target_col = ""
 
-    if numeric_cols:
-        target_col = numeric_cols[0]
+    # Default values if frontend doesn't send anything
+    if not x_axis:
+        x_axis = categorical_cols[0] if categorical_cols else None
 
-        if categorical_cols:
-            x_axis = categorical_cols[0]
+    if not y_axis:
+        y_axis = numeric_cols[0] if numeric_cols else None
+    #New FIX
+    if x_axis not in columns:
+        x_axis = categorical_cols[0] if categorical_cols else None
 
-            try:
-                grouped = (
-                    df.groupby(x_axis)[target_col]
-                    .sum()
-                    .reset_index()
-                )
+    if y_axis not in columns:
+        y_axis = numeric_cols[0] if numeric_cols else None
+    target_col = y_axis
+    print("Received X Axis:", x_axis)
+    print("Received Y Axis:", y_axis)
+    print("Available Columns:", columns)
+    if x_axis and y_axis:
 
-                chart_data = grouped.to_dict(orient="records")
+        try:
 
-            except Exception:
-                chart_data = []
+            if aggregation == "sum":
+                grouped = df.groupby(x_axis)[y_axis].sum().reset_index()
 
-        else:
-            chart_data = (
-                df[[target_col]]
-                .reset_index()
-                .to_dict(orient="records")
-            )
+            elif aggregation == "mean":
+                grouped = df.groupby(x_axis)[y_axis].mean().reset_index()
 
+            elif aggregation == "max":
+                grouped = df.groupby(x_axis)[y_axis].max().reset_index()
+
+            elif aggregation == "min":
+                grouped = df.groupby(x_axis)[y_axis].min().reset_index()
+
+            else:
+                grouped = df.groupby(x_axis)[y_axis].sum().reset_index()
+
+            chart_data = grouped.to_dict(orient="records")
+
+        except Exception:
+            chart_data = []
     # ==========================
     # STORE DATASET INFO FOR CHAT
     # ==========================
@@ -126,9 +139,12 @@ async def upload_file(
         "total_rows": total_rows,
         "preview_summary": df.head(5).to_dict(orient="records")
     }
-
     preview_data = df.head(10).to_dict(orient="records")
-
+    print("Categorical Columns:", categorical_cols)
+    print("Numeric Columns:", numeric_cols)
+    print("X Axis:", x_axis)
+    print("Y Axis:", y_axis)
+    print("Chart Data:", chart_data)
     return {
         "filename": file.filename,
         "columns": columns,
@@ -139,8 +155,8 @@ async def upload_file(
         "column_kpis": column_kpis,
 
         "chart_data": chart_data,
-        "x_key": categorical_cols[0] if categorical_cols else "index",
-        "y_key": target_col
+        "x_key": x_axis,
+        "y_key": y_axis
     }
 # ✅ 2. INTERACTIVE CHAT COPILOT ENDPOINT
 @app.post("/chat")
