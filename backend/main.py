@@ -7,7 +7,7 @@ import os
 from database import engine
 from database import SessionLocal
 from models import Base
-from models import UploadedFile
+from models import UploadedFile, ChatHistory
 from openai import OpenAI
 
 app = FastAPI()
@@ -28,7 +28,31 @@ storage = collections.defaultdict(dict)
 @app.get("/")
 def home():
     return {"message": "Backend Running Successfully"}
+@app.get("/recent-uploads")
+def recent_uploads():
+    db = SessionLocal()
 
+    uploads = (
+        db.query(UploadedFile)
+        .order_by(UploadedFile.created_at.desc())
+        .limit(10)
+        .all()
+    )
+
+    result = []
+
+    for upload in uploads:
+        result.append({
+            "id": upload.id,
+            "filename": upload.filename,
+            "total_rows": upload.total_rows,
+            "total_columns": upload.total_columns,
+            "created_at": upload.created_at
+        })
+
+    db.close()
+
+    return result
 # ✅ 1. FILE UPLOAD ENDPOINT (Yeh missing tha aapki file mein!)
 @app.post("/upload")
 async def upload_file(
@@ -203,7 +227,27 @@ async def chat_with_data(message: str = Form(...)):
                 model="gpt-4o-mini",
                 messages=[{"role": "user", "content": prompt}]
             )
-            return {"reply": response.choices[0].message.content}
+            # OpenAI response ko variable me store karo
+            response_text = response.choices[0].message.content
+
+            # Database session open karo
+            db = SessionLocal()
+
+            # Chat history object banao
+            chat = ChatHistory(
+                 user_query=message,
+                 ai_response=response_text
+            )
+
+            # Database me save karo
+            db.add(chat)
+            db.commit()
+            db.close()
+
+            # User ko response bhejo
+            return {"reply": response_text}
+
+        
         except Exception as e:
             return {"reply": f"AI Routing error: {str(e)}"}
             
@@ -216,11 +260,24 @@ async def chat_with_data(message: str = Form(...)):
                          f"2. 'Analyze the total row distribution recorded'"
             }
         elif "column" in msg_lower or "field" in msg_lower or "structure" in msg_lower:
-            return {"reply": f"Your data layout maps across {len(df_info['columns'])} properties: {', '.join(df_info['columns'])}."}
+            response_text = f"Your data layout maps across {len(df_info['columns'])} properties: {', '.join(df_info['columns'])}."
         elif "row" in msg_lower or "data" in msg_lower or "preview" in msg_lower:
             # 🌟 Return the actual rows snapshot directly from storage memory!
-            return {"reply": f"Here is the preview snapshot of your dataset rows: {df_info['preview_summary']}"}
+            response_text =  f"Here is the preview snapshot of your dataset rows: {df_info['preview_summary']}"
         elif "summary" in msg_lower or "analyze" in msg_lower or "report" in msg_lower:
-            return {"reply": f"Data Profiling Report: File contains {df_info['total_rows']} transactional rows. The categorical breakdowns are synchronized live with your chart vectors!"}
+            response_text =  f"Data Profiling Report: File contains {df_info['total_rows']} transactional rows. The categorical breakdowns are synchronized live with your chart vectors!"
         else:
-            return {"reply": f"Received query: '{message}'. To unlock deep human-like analytics on your '{df_info['columns'][0]}' fields, paste your token inside the backend/.env pipeline!"}
+            response_text = f"Received query: '{message}'. To unlock deep human-like analytics on your '{df_info['columns'][0]}' fields, paste your token inside the backend/.env pipeline!"
+        
+        db = SessionLocal()
+
+        chat = ChatHistory(
+           user_query=message,
+           ai_response=response_text
+        )
+
+        db.add(chat)
+        db.commit()
+        db.close()
+
+        return {"reply": response_text}

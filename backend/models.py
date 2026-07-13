@@ -11,3 +11,10 @@ class UploadedFile(Base):
     total_rows = Column(Integer)
     total_columns = Column(Integer)
     created_at = Column(DateTime, default=datetime.utcnow)
+class ChatHistory(Base):
+    __tablename__ = "chat_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_query = Column(String)
+    ai_response = Column(String)
+    created_at = Column(DateTime, default=datetime.utcnow)

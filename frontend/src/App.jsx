@@ -2,7 +2,7 @@ import Login from "./pages/Login";
 import { signOut } from "firebase/auth";
 import { auth } from "./firebase";
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
 import {
   BarChart,
@@ -24,6 +24,7 @@ import {
 function App() {
   const [file, setFile] = useState(null);
   const [data, setData] = useState(null);
+  const [recentUploads, setRecentUploads] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedX, setSelectedX] = useState("");
 const [selectedY, setSelectedY] = useState("");
@@ -102,6 +103,15 @@ const handleLogout = async () => {
       setChatLoading(false);
     }
   };
+ useEffect(() => {
+    axios.get("http://127.0.0.1:8000/recent-uploads")
+        .then((res) => {
+            setRecentUploads(res.data);
+        })
+        .catch((err) => {
+            console.log(err);
+        });
+}, []); 
 
   return (
     <div className={`min-h-screen p-6 md:p-10 transition-all duration-300 ${
@@ -172,6 +182,49 @@ const handleLogout = async () => {
     Logout
   </button>
 </div> 
+</div>
+{/* Recent Uploads */}
+<div
+  className={`rounded-xl shadow-md p-5 mb-6 ${
+    darkMode
+      ? "bg-gray-800 text-white"
+      : "bg-white text-gray-800"
+  }`}
+>
+  <h2 className="text-xl font-bold mb-4">
+    📁 Recent Uploads
+  </h2>
+
+  {recentUploads.length === 0 ? (
+    <p className={darkMode ? "text-gray-400" : "text-gray-500"}>
+      No uploads found.
+    </p>
+  ) : (
+    recentUploads.map((upload) => (
+      <div
+        key={upload.id}
+        className={`py-2 border-b ${
+          darkMode
+            ? "border-gray-700"
+            : "border-gray-200"
+        }`}
+      >
+        <p className="font-semibold">
+          {upload.filename}
+        </p>
+
+        <p
+          className={`text-sm ${
+            darkMode
+              ? "text-gray-300"
+              : "text-gray-500"
+          }`}
+        >
+          Rows: {upload.total_rows} | Columns: {upload.total_columns}
+        </p>
+      </div>
+    ))
+  )}
 </div>
       {/* Upload Panel */}
       <div className="max-w-7xl mx-auto bg-white p-6 rounded-2xl shadow-sm border border-gray-100 mb-8">
