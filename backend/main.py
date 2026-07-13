@@ -4,9 +4,15 @@ import pandas as pd
 import numpy as np
 import collections
 import os
+from database import engine
+from database import SessionLocal
+from models import Base
+from models import UploadedFile
 from openai import OpenAI
 
 app = FastAPI()
+
+Base.metadata.create_all(bind=engine)
 
 app.add_middleware(
     CORSMiddleware,
@@ -145,6 +151,18 @@ async def upload_file(
     print("X Axis:", x_axis)
     print("Y Axis:", y_axis)
     print("Chart Data:", chart_data)
+    db = SessionLocal()
+
+    new_file = UploadedFile(
+       filename=file.filename,
+       total_rows=total_rows,
+       total_columns=len(columns)
+    )
+    db.add(new_file)
+    db.commit()
+    db.refresh(new_file)
+
+    db.close()
     return {
         "filename": file.filename,
         "columns": columns,
