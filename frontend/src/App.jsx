@@ -247,6 +247,22 @@ const handleLogout = async () => {
 >
     Update Visualization
 </button>
+<a
+    href="http://127.0.0.1:8000/export-csv"
+    target="_blank"
+    rel="noopener noreferrer"
+    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg mt-4 text-center"
+>
+    Download CSV Report
+</a>
+<a
+    href="http://127.0.0.1:8000/export-pdf"
+    target="_blank"
+    rel="noopener noreferrer"
+    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg mt-4 text-center"
+>
+    Download PDF Report
+</a>
         </div>
       </div>
 
