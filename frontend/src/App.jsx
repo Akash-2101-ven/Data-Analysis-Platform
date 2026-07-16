@@ -25,6 +25,7 @@ function App() {
   const [file, setFile] = useState(null);
   const [data, setData] = useState(null);
   const [recentUploads, setRecentUploads] = useState([]);
+  const [showUploads, setShowUploads] = useState(false);
   const [loading, setLoading] = useState(false);
   const [selectedX, setSelectedX] = useState("");
 const [selectedY, setSelectedY] = useState("");
@@ -183,47 +184,60 @@ const handleLogout = async () => {
   </button>
 </div> 
 </div>
-{/* Recent Uploads */}
+{/*Recent Uploads*/}
 <div
-  className={`rounded-xl shadow-md p-5 mb-6 ${
+  className={`rounded-2xl shadow-lg p-5 mb-6 border ${
     darkMode
-      ? "bg-gray-800 text-white"
-      : "bg-white text-gray-800"
+      ? "bg-gray-800 border-gray-700"
+      : "bg-white border-gray-200"
   }`}
 >
-  <h2 className="text-xl font-bold mb-4">
-    📁 Recent Uploads
-  </h2>
+  <button
+    onClick={() => setShowUploads(!showUploads)}
+    className="w-full flex justify-between items-center"
+  >
+    <h2 className="text-xl font-bold">
+      📂 Recent Uploads
+    </h2>
 
-  {recentUploads.length === 0 ? (
-    <p className={darkMode ? "text-gray-400" : "text-gray-500"}>
-      No uploads found.
-    </p>
-  ) : (
-    recentUploads.map((upload) => (
-      <div
-        key={upload.id}
-        className={`py-2 border-b ${
-          darkMode
-            ? "border-gray-700"
-            : "border-gray-200"
-        }`}
-      >
-        <p className="font-semibold">
-          {upload.filename}
-        </p>
+    <span className="text-2xl">
+      {showUploads ? "▲" : "▼"}
+    </span>
+  </button>
 
-        <p
-          className={`text-sm ${
-            darkMode
-              ? "text-gray-300"
-              : "text-gray-500"
-          }`}
-        >
-          Rows: {upload.total_rows} | Columns: {upload.total_columns}
-        </p>
-      </div>
-    ))
+  {showUploads && (
+    <div className="mt-5">
+      {recentUploads.length === 0 ? (
+        <p>No uploads found.</p>
+      ) : (
+        recentUploads.map((upload) => (
+          <div
+            key={upload.id}
+            className={`rounded-xl p-4 mb-3 border transition-all ${
+              darkMode
+                ? "bg-gray-700 border-gray-600"
+                : "bg-gray-50 border-gray-200"
+            }`}
+          >
+            <p className="font-semibold text-lg">
+              📄 {upload.filename}
+            </p>
+
+            <p
+              className={`text-sm ${
+                darkMode
+                  ? "text-gray-300"
+                  : "text-gray-500"
+              }`}
+            >
+              Rows: {upload.total_rows}
+              {" | "}
+              Columns: {upload.total_columns}
+            </p>
+          </div>
+        ))
+      )}
+    </div>
   )}
 </div>
       {/* Upload Panel */}

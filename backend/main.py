@@ -468,6 +468,24 @@ def export_pdf():
         path=file_path,
         filename="dashboard_report.pdf",
         media_type="application/pdf"
-    )    
+    )  
+    
+@app.get("/dataset/{dataset_id}")
+def get_dataset(dataset_id: int):
+
+    db = SessionLocal()
+
+    dataset = (
+        db.query(UploadedFile)
+        .filter(UploadedFile.id == dataset_id)
+        .first()
+    )
+
+    db.close()
+
+    if not dataset:
+        return {"error": "Dataset not found"}
+
+    return dataset      
     
           
