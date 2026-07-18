@@ -618,7 +618,7 @@ function App() {
                 </button>
 
                 <a
-                  href="http://127.0.0.1:8000/export-csv"
+                  href={`http://127.0.0.1:8000/export-csv?search=${encodeURIComponent(debouncedSearch)}&sort=${encodeURIComponent(sortColumn)}&order=${encodeURIComponent(sortOrder)}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex-1 sm:flex-none bg-emerald-500 hover:bg-emerald-600 text-white font-medium px-4 py-2.5 rounded-xl text-center transition shadow-sm shadow-emerald-500/20"
@@ -627,7 +627,7 @@ function App() {
                 </a>
 
                 <a
-                  href="http://127.0.0.1:8000/export-pdf"
+                  href={`http://127.0.0.1:8000/export-pdf?generated_by=${encodeURIComponent(user?.displayName || user?.email || "Guest User")}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex-1 sm:flex-none bg-rose-500 hover:bg-rose-600 text-white font-medium px-4 py-2.5 rounded-xl text-center transition shadow-sm shadow-rose-500/20"
@@ -637,7 +637,9 @@ function App() {
               </div>
 
               <p className={`text-xs mt-3 ${darkMode ? "text-gray-500" : "text-gray-400"}`}>
-                💡 "Generate Dashboard" processes your file and takes you straight to the Dashboard tab.
+                💡 "Generate Dashboard" processes your file and takes you straight to the Dashboard tab. CSV
+                export respects whatever search/sort you've applied in the Explorer tab; PDF export is a full
+                business report.
               </p>
             </div>
           </div>

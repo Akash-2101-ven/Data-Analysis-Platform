@@ -1,11 +1,101 @@
-Name,Age,Department,Salary,Experience
-Rahul,24,IT,45000,2
-Priya,29,HR,52000,5
-Aman,31,Finance,61000,7
-Sneha,26,Marketing,48000,3
-Vikram,35,IT,75000,10
-Neha,28,Sales,53000,4
-Arjun,30,Finance,67000,6
-Pooja,27,HR,50000,3
-Karan,32,Marketing,72000,8
-Anjali,25,Sales,46000,2
+OrderID,Customer,Country,Category,Product,Sales,Quantity,Profit,Discount,OrderDate,Region,PaymentMethod
+ORD0001,Customer_1,Germany,Electronics,Desk,3463,8,850.7,15,2024-06-08,West,Card
+ORD0002,Customer_2,Canada,Electronics,Printer,3366,5,970.07,0,2024-04-08,East,NetBanking
+ORD0003,Customer_3,Germany,Office Supplies,Mouse,3424,8,1024.51,15,2025-03-18,South,UPI
+ORD0004,Customer_4,UK,Furniture,Printer,2394,4,407.38,20,2024-12-12,North,UPI
+ORD0005,Customer_5,UK,Electronics,Chair,2062,8,546.22,5,2024-12-23,West,NetBanking
+ORD0006,Customer_6,Canada,Furniture,Chair,1151,4,181.97,10,2025-04-22,South,Cash
+ORD0007,Customer_7,India,Electronics,Phone,1213,3,333.41,0,2024-08-21,South,UPI
+ORD0008,Customer_8,Australia,Furniture,Mouse,4707,10,887.12,20,2024-12-15,North,NetBanking
+ORD0009,Customer_9,UK,Electronics,Laptop,4579,1,1079.84,10,2024-10-15,East,Card
+ORD0010,Customer_10,India,Office Supplies,Printer,4938,10,331.13,20,2024-09-24,South,UPI
+ORD0011,Customer_11,Australia,Electronics,Laptop,2759,10,281.87,15,2025-04-03,North,Card
+ORD0012,Customer_12,USA,Office Supplies,Desk,978,9,86.04,20,2024-02-08,West,NetBanking
+ORD0013,Customer_13,India,Furniture,Desk,664,10,188.34,15,2024-08-17,South,UPI
+ORD0014,Customer_14,USA,Office Supplies,Printer,1081,9,161.82,20,2024-11-29,North,NetBanking
+ORD0015,Customer_15,UK,Office Supplies,Laptop,2273,3,374.66,5,2024-02-28,East,Cash
+ORD0016,Customer_16,USA,Office Supplies,Desk,4014,5,365.53,20,2024-07-24,West,Cash
+ORD0017,Customer_17,Australia,Electronics,Mouse,4999,5,797.16,0,2024-03-11,North,Cash
+ORD0018,Customer_18,India,Office Supplies,Monitor,2548,2,461.73,10,2024-01-02,South,Card
+ORD0019,Customer_19,India,Furniture,Laptop,1531,3,331.16,10,2025-04-13,South,Card
+ORD0020,Customer_20,Germany,Office Supplies,Phone,3534,3,401.93,15,2025-03-17,West,Cash
+ORD0021,Customer_21,Germany,Office Supplies,Desk,1431,2,183.4,20,2025-04-02,South,Card
+ORD0022,Customer_22,UK,Furniture,Chair,2234,2,290.44,20,2024-06-11,North,Cash
+ORD0023,Customer_23,India,Electronics,Printer,335,7,49.91,10,2025-03-18,West,Card
+ORD0024,Customer_24,Australia,Office Supplies,Laptop,331,7,59.77,0,2024-08-26,East,Card
+ORD0025,Customer_25,Germany,Electronics,Printer,1490,5,210.74,5,2024-12-17,North,UPI
+ORD0026,Customer_26,India,Furniture,Mouse,291,10,62.71,5,2025-01-24,East,Card
+ORD0027,Customer_27,Australia,Office Supplies,Mouse,3493,8,1005.88,20,2024-01-09,North,UPI
+ORD0028,Customer_28,Canada,Electronics,Chair,3077,5,341.57,20,2025-01-15,East,NetBanking
+ORD0029,Customer_29,UK,Furniture,Keyboard,709,10,61.36,20,2024-04-29,North,UPI
+ORD0030,Customer_30,Canada,Office Supplies,Monitor,3053,7,812.06,20,2024-12-31,West,Cash
+ORD0031,Customer_31,UK,Electronics,Mouse,4909,4,402.69,15,2025-02-06,North,NetBanking
+ORD0032,Customer_32,USA,Furniture,Desk,4872,9,485.21,15,2025-03-11,South,UPI
+ORD0033,Customer_33,Germany,Electronics,Mouse,4355,9,1007.88,20,2024-05-27,West,Card
+ORD0034,Customer_34,Germany,Furniture,Printer,2714,6,176.62,15,2024-12-08,East,NetBanking
+ORD0035,Customer_35,USA,Electronics,Printer,3767,8,381.26,15,2024-12-02,North,UPI
+ORD0036,Customer_36,Germany,Furniture,Monitor,4485,9,1081.09,10,2025-02-20,West,NetBanking
+ORD0037,Customer_37,USA,Office Supplies,Chair,3456,3,776.25,5,2024-09-10,West,Cash
+ORD0038,Customer_38,UK,Furniture,Monitor,1375,1,389.09,15,2025-02-10,North,NetBanking
+ORD0039,Customer_39,Canada,Furniture,Desk,1480,4,175.05,15,2025-03-10,South,NetBanking
+ORD0040,Customer_40,UK,Office Supplies,Keyboard,2767,6,167.34,10,2024-05-21,East,UPI
+ORD0041,Customer_41,UK,Electronics,Desk,3578,3,560.11,0,2024-01-28,North,Card
+ORD0042,Customer_42,Canada,Office Supplies,Chair,2962,10,877.45,15,2024-07-22,North,NetBanking
+ORD0043,Customer_43,India,Furniture,Keyboard,3926,10,247.01,10,2024-11-24,North,NetBanking
+ORD0044,Customer_44,Germany,Electronics,Chair,4842,9,570.78,10,2024-08-24,West,UPI
+ORD0045,Customer_45,USA,Furniture,Mouse,1159,5,307.4,0,2024-10-13,West,Cash
+ORD0046,Customer_46,India,Furniture,Keyboard,3434,3,603.8,15,2025-03-28,West,Card
+ORD0047,Customer_47,Australia,Electronics,Laptop,2079,3,512.07,15,2025-01-12,East,NetBanking
+ORD0048,Customer_48,USA,Office Supplies,Laptop,1201,3,330.52,5,2024-02-27,South,Cash
+ORD0049,Customer_49,Germany,Furniture,Desk,2537,6,434.0,15,2025-05-02,South,NetBanking
+ORD0050,Customer_50,Germany,Electronics,Printer,4701,9,1234.83,5,2024-12-18,West,NetBanking
+ORD0051,Customer_51,UK,Electronics,Phone,2284,6,133.34,15,2024-01-17,West,UPI
+ORD0052,Customer_52,USA,Office Supplies,Monitor,3582,10,462.42,10,2024-12-01,South,Card
+ORD0053,Customer_53,Canada,Office Supplies,Printer,1189,9,127.41,15,2024-06-19,East,Card
+ORD0054,Customer_54,Germany,Electronics,Keyboard,2770,4,677.91,10,2024-01-30,North,UPI
+ORD0055,Customer_55,UK,Furniture,Monitor,4685,2,1215.19,20,2025-05-01,East,Cash
+ORD0056,Customer_56,USA,Furniture,Printer,400,9,79.18,0,2024-07-31,West,Card
+ORD0057,Customer_57,Australia,Office Supplies,Chair,2378,5,333.61,10,2025-02-22,South,UPI
+ORD0058,Customer_58,Australia,Furniture,Mouse,1352,8,361.56,20,2024-02-03,South,Cash
+ORD0059,Customer_59,UK,Furniture,Chair,4876,3,835.44,10,2024-04-06,North,UPI
+ORD0060,Customer_60,Germany,Furniture,Phone,1941,7,310.07,10,2024-02-08,West,NetBanking
+ORD0061,Customer_61,UK,Electronics,Monitor,2165,5,443.59,10,2024-11-19,East,UPI
+ORD0062,Customer_62,Germany,Furniture,Monitor,1858,9,216.54,0,2024-01-23,North,Cash
+ORD0063,Customer_63,India,Office Supplies,Monitor,4312,8,230.07,15,2024-10-25,East,UPI
+ORD0064,Customer_64,Germany,Furniture,Laptop,2740,8,188.16,15,2025-01-08,East,NetBanking
+ORD0065,Customer_65,Germany,Electronics,Desk,4320,3,1282.96,0,2024-01-14,East,NetBanking
+ORD0066,Customer_66,Canada,Furniture,Desk,4731,1,1149.28,0,2025-01-13,West,Cash
+ORD0067,Customer_67,Germany,Furniture,Keyboard,778,2,50.0,20,2024-06-08,South,Card
+ORD0068,Customer_68,Australia,Office Supplies,Laptop,3189,8,386.98,20,2024-02-26,South,Cash
+ORD0069,Customer_69,Australia,Office Supplies,Mouse,3727,10,861.29,0,2024-05-12,East,NetBanking
+ORD0070,Customer_70,India,Furniture,Printer,3936,3,247.11,20,2024-11-01,East,UPI
+ORD0071,Customer_71,Australia,Office Supplies,Printer,546,7,35.38,15,2024-02-14,North,NetBanking
+ORD0072,Customer_72,Germany,Office Supplies,Chair,3408,3,1008.35,20,2024-05-04,East,NetBanking
+ORD0073,Customer_73,Germany,Furniture,Monitor,3997,9,341.43,15,2024-10-01,East,Card
+ORD0074,Customer_74,Australia,Office Supplies,Keyboard,4714,2,569.66,5,2025-05-05,West,Cash
+ORD0075,Customer_75,UK,Office Supplies,Laptop,1038,4,157.09,0,2024-11-08,South,Card
+ORD0076,Customer_76,Australia,Office Supplies,Laptop,3348,9,847.86,20,2024-09-26,South,Card
+ORD0077,Customer_77,Germany,Office Supplies,Chair,1663,10,107.09,0,2024-08-10,West,UPI
+ORD0078,Customer_78,UK,Office Supplies,Desk,3793,4,1137.23,10,2024-12-28,West,UPI
+ORD0079,Customer_79,India,Electronics,Printer,621,9,156.69,5,2025-02-13,North,Cash
+ORD0080,Customer_80,UK,Office Supplies,Monitor,4643,9,252.65,0,2024-02-11,West,NetBanking
+ORD0081,Customer_81,UK,Furniture,Mouse,1170,10,177.46,5,2024-06-29,South,NetBanking
+ORD0082,Customer_82,USA,Furniture,Mouse,1655,2,155.75,5,2024-05-04,North,NetBanking
+ORD0083,Customer_83,Australia,Electronics,Phone,1194,9,222.77,0,2024-02-19,South,Cash
+ORD0084,Customer_84,Germany,Furniture,Printer,2259,8,117.57,0,2024-04-25,North,Card
+ORD0085,Customer_85,USA,Furniture,Chair,4427,6,1194.52,0,2024-06-18,North,Cash
+ORD0086,Customer_86,Canada,Furniture,Monitor,2691,3,641.01,10,2024-11-13,South,NetBanking
+ORD0087,Customer_87,UK,Electronics,Mouse,2113,1,293.72,15,2025-04-28,South,Card
+ORD0088,Customer_88,UK,Office Supplies,Keyboard,2733,4,193.58,10,2025-04-06,West,NetBanking
+ORD0089,Customer_89,Germany,Office Supplies,Phone,2550,5,724.05,0,2025-03-19,South,UPI
+ORD0090,Customer_90,Germany,Furniture,Phone,1939,3,520.23,5,2025-02-27,North,Card
+ORD0091,Customer_91,USA,Furniture,Mouse,3923,2,454.69,0,2024-05-14,West,UPI
+ORD0092,Customer_92,Germany,Office Supplies,Mouse,550,8,89.33,10,2025-02-10,East,NetBanking
+ORD0093,Customer_93,Canada,Electronics,Chair,1123,4,146.35,5,2024-11-13,North,Card
+ORD0094,Customer_94,USA,Furniture,Printer,999,2,243.67,20,2024-07-02,South,Card
+ORD0095,Customer_95,Germany,Electronics,Keyboard,4412,9,595.36,10,2024-05-03,South,NetBanking
+ORD0096,Customer_96,Germany,Office Supplies,Desk,1979,2,240.05,20,2024-10-03,North,Cash
+ORD0097,Customer_97,Australia,Office Supplies,Mouse,1741,7,325.29,15,2024-01-26,North,UPI
+ORD0098,Customer_98,India,Office Supplies,Keyboard,3431,7,277.03,15,2024-06-17,South,Cash
+ORD0099,Customer_99,India,Furniture,Printer,3149,7,814.2,10,2025-03-29,North,UPI
+ORD0100,Customer_100,Canada,Office Supplies,Chair,1661,10,386.18,0,2024-04-24,North,NetBanking
