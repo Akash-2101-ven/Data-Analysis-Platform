@@ -142,11 +142,16 @@ async def upload_file(
 
     for col in numeric_cols:
         try:
+            std_val = df[col].std()
+            var_val = df[col].var()
             column_kpis[col] = {
                 "sum": round(float(df[col].sum()), 2),
                 "average": round(float(df[col].mean()), 2),
                 "max": round(float(df[col].max()), 2),
-                "min": round(float(df[col].min()), 2)
+                "min": round(float(df[col].min()), 2),
+                "median": round(float(df[col].median()), 2),
+                "std_dev": round(float(std_val), 2) if pd.notna(std_val) else 0.0,
+                "variance": round(float(var_val), 2) if pd.notna(var_val) else 0.0
             }
         except Exception:
             pass
@@ -195,6 +200,69 @@ async def upload_file(
 
         except Exception:
             chart_data = []
+
+    # ==========================
+    # CORRELATION MATRIX (descriptive analytics -> heatmap on the frontend)
+    # ==========================
+    correlation_matrix = {"columns": [], "matrix": []}
+    if len(numeric_cols) >= 2:
+        try:
+            corr_df = df[numeric_cols].corr().fillna(0).round(2)
+            correlation_matrix = {
+                "columns": list(corr_df.columns),
+                "matrix": corr_df.values.tolist()
+            }
+        except Exception:
+            pass
+
+    # ==========================
+    # FORECAST / TREND (predictive analytics)
+    # Simple linear regression over the grouped chart values — fits a trend
+    # line over the existing categories and projects 3 points forward.
+    # This is intentionally lightweight (no external ML deps) but gives a
+    # genuine, defensible predictive signal rather than a fake number.
+    # ==========================
+    forecast_data = []
+    trend_info = {}
+    if chart_data and y_axis:
+        try:
+            y_values = np.array([row.get(y_axis) or 0 for row in chart_data], dtype=float)
+            x_positions = np.arange(len(y_values))
+            if len(y_values) >= 2:
+                slope, intercept = np.polyfit(x_positions, y_values, 1)
+                fitted = (slope * x_positions + intercept).round(2)
+
+                for i, row in enumerate(chart_data):
+                    forecast_data.append({
+                        x_axis: row.get(x_axis),
+                        "actual": round(float(y_values[i]), 2),
+                        "trend": float(fitted[i])
+                    })
+
+                future_points = 3
+                for i in range(future_points):
+                    pos = len(y_values) + i
+                    predicted = round(float(slope * pos + intercept), 2)
+                    forecast_data.append({
+                        x_axis: f"Forecast {i + 1}",
+                        "actual": None,
+                        "trend": predicted
+                    })
+
+                # R^2 so the frontend can show how trustworthy the trend is
+                residuals = y_values - fitted
+                ss_res = float(np.sum(residuals ** 2))
+                ss_tot = float(np.sum((y_values - y_values.mean()) ** 2))
+                r_squared = round(1 - (ss_res / ss_tot), 3) if ss_tot > 0 else 0.0
+
+                trend_info = {
+                    "slope": round(float(slope), 4),
+                    "direction": "increasing" if slope > 0 else ("decreasing" if slope < 0 else "flat"),
+                    "r_squared": r_squared
+                }
+        except Exception:
+            forecast_data = []
+            trend_info = {}
     # ==========================
     # STORE DATASET INFO FOR CHAT + SMART DATA EXPLORER
     # ==========================
@@ -217,6 +285,9 @@ async def upload_file(
          "categorical_columns": categorical_cols,
          "x_key": x_axis,
          "y_key": y_axis,
+         "correlation_matrix": correlation_matrix,
+         "forecast_data": forecast_data,
+         "trend_info": trend_info,
 
          # Metadata used by the PDF/CSV export endpoints
          "filename": file.filename,
@@ -253,7 +324,11 @@ async def upload_file(
 
         "chart_data": chart_data,
         "x_key": x_axis,
-        "y_key": y_axis
+        "y_key": y_axis,
+
+        "correlation_matrix": correlation_matrix,
+        "forecast_data": forecast_data,
+        "trend_info": trend_info
     }
 
 
@@ -621,6 +696,15 @@ def _rule_based_insights(df, df_info):
         except Exception:
             pass
 
+    trend_info = df_info.get("trend_info") or {}
+    if trend_info.get("direction") and trend_info.get("direction") != "flat":
+        r2 = trend_info.get("r_squared", 0)
+        confidence = "high" if r2 >= 0.6 else ("moderate" if r2 >= 0.3 else "low")
+        insights.append(
+            f"{y_axis} shows an {trend_info['direction']} trend across {x_axis} groups "
+            f"({confidence} confidence, R² = {r2})."
+        )
+
     insights.append(
         f"Dataset spans {overview_kpis.get('total_rows', 0):,} records across "
         f"{overview_kpis.get('total_columns', 0)} fields, with {overview_kpis.get('numeric_columns', 0)} "
@@ -760,16 +844,17 @@ def export_pdf(generated_by: str = Query("Guest User")):
     # ---------------- COLUMN ANALYTICS ----------------
     story.append(Paragraph("Column Analytics", _pdf_styles["SectionHeading"]))
     if column_kpis:
-        col_table_data = [["Column", "Sum", "Average", "Maximum", "Minimum"]]
+        col_table_data = [["Column", "Sum", "Average", "Median", "Maximum", "Minimum"]]
         for col, stats in column_kpis.items():
             col_table_data.append([
                 col,
                 f"{stats['sum']:,.2f}",
                 f"{stats['average']:,.2f}",
+                f"{stats.get('median', 0):,.2f}",
                 f"{stats['max']:,.2f}",
                 f"{stats['min']:,.2f}",
             ])
-        story.append(styled_table(col_table_data, col_widths=[120, 90, 90, 90, 90]))
+        story.append(styled_table(col_table_data, col_widths=[95, 80, 80, 80, 80, 80]))
     else:
         story.append(Paragraph("No numeric columns were detected in this dataset.", _pdf_styles["Normal"]))
     story.append(Spacer(1, 16))

@@ -2,8 +2,9 @@ import Login from "./pages/Login";
 import { signOut } from "firebase/auth";
 import { auth } from "./firebase";
 import { useNavigate } from "react-router-dom";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import axios from "axios";
+import html2canvas from "html2canvas";
 import {
   BarChart,
   Bar,
@@ -67,6 +68,15 @@ function App() {
   // "Top N + Others" view by default and let the user widen it if they want.
   const [pieTopN, setPieTopN] = useState(8);
 
+  // Drill-down: clicking a bar/pie segment shows the matching raw rows
+  const [drillCategory, setDrillCategory] = useState(null);
+  const [drillRows, setDrillRows] = useState([]);
+  const [drillLoading, setDrillLoading] = useState(false);
+
+  // Ref around the chart section so "Download PNG" can snapshot just the visuals
+  const chartsRef = useRef(null);
+  const [pngExporting, setPngExporting] = useState(false);
+
   const uploadFile = async (redirectTab) => {
     if (!file) {
       alert("Please select a file first!");
@@ -101,6 +111,8 @@ function App() {
       setDebouncedSearch("");
       setSortColumnState("");
       setSortOrder("asc");
+      setDrillCategory(null);
+      setDrillRows([]);
       if (redirectTab) setActiveTab(redirectTab);
     } catch (error) {
       console.error(error);
@@ -134,6 +146,8 @@ function App() {
     setExplorerRows([]);
     setExplorerTotalRows(0);
     setExplorerTotalPages(1);
+    setDrillCategory(null);
+    setDrillRows([]);
   };
 
   // Fetches one page of rows from the backend instead of loading the whole dataset
@@ -301,6 +315,60 @@ function App() {
 
     return [...top, { [data.x_key]: `Others (${rest.length})`, [data.y_key]: othersTotal }];
   }, [data, pieTopN]);
+
+  // Maps a correlation coefficient (-1 to +1) to a color: indigo for positive,
+  // red for negative, intensity scales with strength. Used by the heatmap.
+  const getCorrelationColor = (value) => {
+    const v = Math.max(-1, Math.min(1, Number(value) || 0));
+    const alpha = 0.12 + Math.abs(v) * 0.75;
+    return v >= 0 ? `rgba(99, 102, 241, ${alpha})` : `rgba(239, 68, 68, ${alpha})`;
+  };
+
+  // Drill-down: fetch the raw rows behind a clicked bar/pie category so users
+  // can see exactly which records make up that slice of the chart.
+  const fetchDrillDownRows = async (category) => {
+    if (!data || !category || String(category).startsWith("Others")) return;
+    setDrillCategory(category);
+    setDrillLoading(true);
+    try {
+      const response = await axios.get("http://127.0.0.1:8000/data", {
+        params: { column: data.x_key, value: category, page: 1, limit: 10 }
+      });
+      setDrillRows(response.data.rows || []);
+    } catch (error) {
+      console.error(error);
+      setDrillRows([]);
+    } finally {
+      setDrillLoading(false);
+    }
+  };
+
+  const clearDrillDown = () => {
+    setDrillCategory(null);
+    setDrillRows([]);
+  };
+
+  // PNG export: snapshots the chart section exactly as rendered on screen
+  const handleDownloadPng = async () => {
+    if (!chartsRef.current) return;
+    setPngExporting(true);
+    try {
+      const canvas = await html2canvas(chartsRef.current, {
+        backgroundColor: darkMode ? "#111827" : "#ffffff",
+        scale: 2,
+        useCORS: true
+      });
+      const link = document.createElement("a");
+      link.download = `dashboard-visuals-${Date.now()}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    } catch (error) {
+      console.error(error);
+      alert("Couldn't generate PNG — please try again.");
+    } finally {
+      setPngExporting(false);
+    }
+  };
 
   return (
     <div
@@ -546,7 +614,7 @@ function App() {
                   Object.entries(data.column_kpis).map(([column, stats]) => (
                     <div key={column} className="mb-6">
                       <h3 className="text-lg font-semibold mb-3">{column} Analytics</h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
                         <div className={`p-5 rounded-2xl shadow-sm border ${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-100"}`}>
                           <p className="text-sm text-gray-400 uppercase">Sum</p>
                           <p className="text-xl font-bold text-emerald-600">{stats.sum.toLocaleString()}</p>
@@ -554,6 +622,14 @@ function App() {
                         <div className={`p-5 rounded-2xl shadow-sm border ${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-100"}`}>
                           <p className="text-sm text-gray-400 uppercase">Average</p>
                           <p className="text-xl font-bold text-blue-600">{stats.average.toLocaleString()}</p>
+                        </div>
+                        <div className={`p-5 rounded-2xl shadow-sm border ${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-100"}`}>
+                          <p className="text-sm text-gray-400 uppercase">Median</p>
+                          <p className="text-xl font-bold text-cyan-600">{(stats.median ?? 0).toLocaleString()}</p>
+                        </div>
+                        <div className={`p-5 rounded-2xl shadow-sm border ${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-100"}`}>
+                          <p className="text-sm text-gray-400 uppercase">Std Dev</p>
+                          <p className="text-xl font-bold text-fuchsia-600">{(stats.std_dev ?? 0).toLocaleString()}</p>
                         </div>
                         <div className={`p-5 rounded-2xl shadow-sm border ${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-100"}`}>
                           <p className="text-sm text-gray-400 uppercase">Maximum</p>
@@ -648,11 +724,25 @@ function App() {
         {/* ================= VISUALIZATIONS TAB ================= */}
         {activeTab === "visualizations" && (
           <div key="visualizations" className="tab-fade max-w-7xl mx-auto space-y-8">
-            <div className="flex items-center gap-4">
-              <PageIcon icon="📈" />
-              <h1 className={`text-3xl font-extrabold ${darkMode ? "text-white" : "text-gray-900"}`}>
-                Visualizations
-              </h1>
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-4">
+                <PageIcon icon="📈" />
+                <h1 className={`text-3xl font-extrabold ${darkMode ? "text-white" : "text-gray-900"}`}>
+                  Visualizations
+                </h1>
+              </div>
+
+              {data && data.chart_data && data.chart_data.length > 0 && (
+                <button
+                  onClick={handleDownloadPng}
+                  disabled={pngExporting}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border transition disabled:opacity-50 disabled:cursor-not-allowed ${
+                    darkMode ? "border-gray-700 bg-gray-800 text-gray-200 hover:bg-gray-700" : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  {pngExporting ? "Exporting…" : "🖼️ Download PNG"}
+                </button>
+              )}
             </div>
 
             {!data && (
@@ -746,7 +836,7 @@ function App() {
                 </div>
 
                 {data.chart_data && data.chart_data.length > 0 && (
-                  <>
+                  <div ref={chartsRef} className="space-y-8">
                     {/* Quick stat chips (replaces old debug box) */}
                     <div className="flex flex-wrap gap-3">
                       <span className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${darkMode ? "bg-gray-800 border-gray-700 text-gray-300" : "bg-indigo-50 border-indigo-100 text-indigo-700"}`}>
@@ -757,6 +847,9 @@ function App() {
                       </span>
                       <span className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${darkMode ? "bg-gray-800 border-gray-700 text-gray-300" : "bg-emerald-50 border-emerald-100 text-emerald-700"}`}>
                         {data.chart_data.length} data points
+                      </span>
+                      <span className={`text-xs font-medium px-3 py-1.5 rounded-full border ${darkMode ? "bg-gray-800 border-gray-700 text-gray-500" : "bg-gray-50 border-gray-200 text-gray-500"}`}>
+                        💡 Click a bar or pie slice to drill down into its rows
                       </span>
                     </div>
 
@@ -773,7 +866,14 @@ function App() {
                             <XAxis dataKey={data.x_key} tickLine={false} stroke="#9ca3af" />
                             <YAxis tickLine={false} stroke="#9ca3af" />
                             <Tooltip cursor={{ fill: "#f9fafb" }} contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }} />
-                            <Bar dataKey={data.y_key} fill="#6366f1" radius={[6, 6, 0, 0]} maxBarSize={50} />
+                            <Bar
+                              dataKey={data.y_key}
+                              fill="#6366f1"
+                              radius={[6, 6, 0, 0]}
+                              maxBarSize={50}
+                              cursor="pointer"
+                              onClick={(entry) => fetchDrillDownRows(entry?.payload?.[data.x_key] ?? entry?.[data.x_key])}
+                            />
                           </BarChart>
                         </ResponsiveContainer>
                       </div>
@@ -826,6 +926,8 @@ function App() {
                                     fill={isOthers ? OTHERS_COLOR : PIE_COLORS[index % PIE_COLORS.length]}
                                     stroke={darkMode ? "#1f2937" : "#ffffff"}
                                     strokeWidth={2}
+                                    cursor={isOthers ? "default" : "pointer"}
+                                    onClick={() => !isOthers && fetchDrillDownRows(entry[data.x_key])}
                                   />
                                 );
                               })}
@@ -866,7 +968,156 @@ function App() {
                         </ResponsiveContainer>
                       </div>
                     </div>
-                  </>
+
+                    {/* PREDICTIVE TREND / FORECAST CHART */}
+                    {data.forecast_data && data.forecast_data.length > 0 && (
+                      <div className={`p-6 rounded-2xl shadow-sm border ${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-100"}`}>
+                        <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
+                          <div>
+                            <h3 className="text-xl font-bold">Predictive Trend Forecast</h3>
+                            <p className="text-sm text-gray-400 mt-1">
+                              Linear regression fit over {data.x_key} groups, projected 3 steps ahead
+                            </p>
+                          </div>
+                          {data.trend_info?.direction && (
+                            <span
+                              className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${
+                                data.trend_info.direction === "increasing"
+                                  ? "bg-emerald-50 border-emerald-100 text-emerald-700"
+                                  : data.trend_info.direction === "decreasing"
+                                  ? "bg-red-50 border-red-100 text-red-700"
+                                  : "bg-gray-50 border-gray-200 text-gray-600"
+                              } ${darkMode ? "bg-gray-900 border-gray-700 text-gray-300" : ""}`}
+                            >
+                              {data.trend_info.direction === "increasing" ? "📈" : data.trend_info.direction === "decreasing" ? "📉" : "➡️"}{" "}
+                              {data.trend_info.direction} · R² {data.trend_info.r_squared}
+                            </span>
+                          )}
+                        </div>
+                        <div className="w-full h-72 mt-4">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={data.forecast_data}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                              <XAxis dataKey={data.x_key} tickLine={false} stroke="#9ca3af" angle={-20} textAnchor="end" height={55} interval={0} tick={{ fontSize: 11 }} />
+                              <YAxis tickLine={false} stroke="#9ca3af" />
+                              <Tooltip contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }} />
+                              <Legend />
+                              <Line type="monotone" dataKey="actual" name="Actual" stroke="#6366f1" strokeWidth={3} dot={{ r: 3 }} connectNulls={false} />
+                              <Line type="monotone" dataKey="trend" name="Trend / Forecast" stroke="#f59e0b" strokeWidth={2} strokeDasharray="6 4" dot={false} />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
+                        <p className={`text-xs mt-3 ${darkMode ? "text-gray-500" : "text-gray-400"}`}>
+                          💡 The last 3 points on the right (no "Actual" value) are forecasted, based on a simple linear trend — not a guarantee of future performance.
+                        </p>
+                      </div>
+                    )}
+
+                    {/* CORRELATION HEATMAP */}
+                    {data.correlation_matrix?.columns?.length >= 2 && (
+                      <div className={`p-6 rounded-2xl shadow-sm border ${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-100"}`}>
+                        <h3 className="text-xl font-bold mb-2">Correlation Heatmap</h3>
+                        <p className="text-sm text-gray-400 mb-6">
+                          How strongly numeric columns move together, from -1 (opposite) to +1 (same direction)
+                        </p>
+                        <div className="overflow-x-auto">
+                          <table className="border-collapse">
+                            <thead>
+                              <tr>
+                                <th className="p-2"></th>
+                                {data.correlation_matrix.columns.map((col) => (
+                                  <th key={col} className={`p-2 text-xs font-semibold whitespace-nowrap ${darkMode ? "text-gray-300" : "text-gray-600"}`}>
+                                    {col}
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {data.correlation_matrix.columns.map((rowCol, i) => (
+                                <tr key={rowCol}>
+                                  <td className={`p-2 text-xs font-semibold whitespace-nowrap text-right pr-3 ${darkMode ? "text-gray-300" : "text-gray-600"}`}>
+                                    {rowCol}
+                                  </td>
+                                  {data.correlation_matrix.matrix[i].map((val, j) => (
+                                    <td
+                                      key={j}
+                                      className="text-center text-xs font-semibold w-16 h-11 rounded-lg"
+                                      style={{
+                                        backgroundColor: getCorrelationColor(val),
+                                        color: Math.abs(val) > 0.55 ? "#ffffff" : darkMode ? "#e5e7eb" : "#1f2937"
+                                      }}
+                                    >
+                                      {val.toFixed(2)}
+                                    </td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* DRILL-DOWN PANEL — sits outside the PNG-captured ref since it's supplementary, not a chart */}
+                {drillCategory && (
+                  <div className={`rounded-2xl border p-6 ${darkMode ? "bg-gray-800 border-indigo-500/40" : "bg-white border-indigo-200"}`}>
+                    <div className="flex items-center justify-between gap-3 mb-4">
+                      <div>
+                        <h3 className="text-lg font-bold flex items-center gap-2">
+                          🔎 Drill-down: {data.x_key} = "{drillCategory}"
+                        </h3>
+                        <p className={`text-xs mt-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                          Showing up to 10 matching raw records
+                        </p>
+                      </div>
+                      <button
+                        onClick={clearDrillDown}
+                        className={`text-sm font-medium px-3 py-1.5 rounded-lg border transition shrink-0 ${
+                          darkMode ? "border-gray-600 text-gray-300 hover:bg-gray-700" : "border-gray-200 text-gray-600 hover:bg-gray-100"
+                        }`}
+                      >
+                        ✕ Close
+                      </button>
+                    </div>
+
+                    {drillLoading ? (
+                      <p className={`text-sm animate-pulse ${darkMode ? "text-gray-400" : "text-gray-500"}`}>⏳ Loading rows…</p>
+                    ) : drillRows.length === 0 ? (
+                      <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>No matching rows found.</p>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                          <thead>
+                            <tr className={darkMode ? "bg-gray-900 border-b border-gray-700" : "bg-gray-50 border-b border-gray-100"}>
+                              {data.columns.slice(0, 6).map((col) => (
+                                <th key={col} className={`text-xs uppercase font-semibold tracking-wider px-4 py-3 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                                  {col}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-700/20">
+                            {drillRows.map((row, index) => (
+                              <tr key={index} className={darkMode ? "hover:bg-gray-700/40 transition" : "hover:bg-gray-50/50 transition"}>
+                                {data.columns.slice(0, 6).map((col, i) => (
+                                  <td key={i} className="px-4 py-3 text-sm font-medium whitespace-nowrap">
+                                    {row[col] !== null && row[col] !== undefined ? row[col].toString() : "—"}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        {data.columns.length > 6 && (
+                          <p className={`text-xs mt-3 ${darkMode ? "text-gray-500" : "text-gray-400"}`}>
+                            Showing first 6 of {data.columns.length} columns — open the Explorer tab and search "{drillCategory}" for the full row.
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 )}
               </>
             )}
