@@ -1,7 +1,8 @@
-from fastapi import FastAPI, UploadFile, File, Form
+from fastapi import FastAPI, UploadFile, File, Form, Query
 from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
 import numpy as np
+import math
 from fastapi.responses import FileResponse
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
@@ -165,14 +166,18 @@ async def upload_file(
         except Exception:
             chart_data = []
     # ==========================
-    # STORE DATASET INFO FOR CHAT
+    # STORE DATASET INFO FOR CHAT + SMART DATA EXPLORER
     # ==========================
+    # NOTE: we keep the ORIGINAL (unfiltered, unsorted) dataframe here.
+    # The /data endpoint below reads from this same storage and applies
+    # search/sort/pagination on top of it per-request, so the full dataset
+    # never has to be sent to the browser in one shot.
     storage["current_df"] = {
         "df": df,
         "columns": columns,
         "total_rows": total_rows,
         "preview_summary": df.head(5).to_dict(orient="records"),
-    
+
          "overview_kpis": overview_kpis,
          "column_kpis": column_kpis,
          "chart_data": chart_data,
@@ -210,6 +215,69 @@ async def upload_file(
         "x_key": x_axis,
         "y_key": y_axis
     }
+
+
+# ✅ NEW: SMART DATA EXPLORER ENDPOINT (pagination + search + sort + filter)
+@app.get("/data")
+def get_data(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=500),
+    search: str = Query("", description="Free-text search across all columns"),
+    sort: str = Query("", description="Column name to sort by"),
+    order: str = Query("asc", description="asc or desc"),
+    column: str = Query("", description="Optional column name to filter on"),
+    value: str = Query("", description="Value to match when 'column' is provided")
+):
+    df_info = storage.get("current_df")
+
+    if not df_info:
+        return {"error": "No dataset loaded"}
+
+    # Always start from the original, untouched dataframe for this request
+    df = df_info["df"].copy()
+
+    # ---- Column filter (e.g. Country = India) ----
+    if column and value and column in df.columns:
+        df = df[df[column].astype(str).str.lower() == value.strip().lower()]
+
+    # ---- Free text search across every column ----
+    if search:
+        search_lower = search.strip().lower()
+        mask = df.apply(
+            lambda row: row.astype(str).str.lower().str.contains(search_lower, na=False).any(),
+            axis=1
+        )
+        df = df[mask]
+
+    # ---- Sorting ----
+    if sort and sort in df.columns:
+        df = df.sort_values(
+            by=sort,
+            ascending=(order != "desc"),
+            na_position="last",
+            kind="mergesort"  # stable sort so paging stays consistent
+        )
+
+    total_rows = len(df)
+    total_pages = max(1, math.ceil(total_rows / limit))
+    safe_page = min(max(page, 1), total_pages)
+
+    start = (safe_page - 1) * limit
+    end = start + limit
+
+    page_df = df.iloc[start:end].replace({np.nan: None})
+    rows = page_df.to_dict(orient="records")
+
+    return {
+        "page": safe_page,
+        "limit": limit,
+        "total_pages": total_pages,
+        "total_rows": total_rows,
+        "columns": df_info["columns"],
+        "rows": rows
+    }
+
+
 # ✅ 2. INTERACTIVE CHAT COPILOT ENDPOINT
 @app.post("/chat")
 async def chat_with_data(message: str = Form(...)):
@@ -486,6 +554,4 @@ def get_dataset(dataset_id: int):
     if not dataset:
         return {"error": "Dataset not found"}
 
-    return dataset      
-    
-          
+    return dataset

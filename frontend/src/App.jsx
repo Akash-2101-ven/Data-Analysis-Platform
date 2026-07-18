@@ -2,7 +2,7 @@ import Login from "./pages/Login";
 import { signOut } from "firebase/auth";
 import { auth } from "./firebase";
 import { useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import axios from "axios";
 import {
   BarChart,
@@ -19,6 +19,10 @@ import {
   CartesianGrid,
   Legend
 } from "recharts";
+
+// Shared palette for pie/category colors — "Others" always renders in neutral slate
+const PIE_COLORS = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#14b8a6", "#3b82f6", "#f97316", "#06b6d4"];
+const OTHERS_COLOR = "#94a3b8";
 
 function App() {
   const [file, setFile] = useState(null);
@@ -46,6 +50,22 @@ function App() {
     { role: "assistant", text: "Hello! Upload a data file and ask me anything about your metrics." }
   ]);
   const [chatLoading, setChatLoading] = useState(false);
+
+  // Smart Data Explorer states (server-side pagination/search/sort)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(20);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [sortColumn, setSortColumnState] = useState("");
+  const [sortOrder, setSortOrder] = useState("asc");
+  const [explorerRows, setExplorerRows] = useState([]);
+  const [explorerTotalRows, setExplorerTotalRows] = useState(0);
+  const [explorerTotalPages, setExplorerTotalPages] = useState(1);
+  const [explorerLoading, setExplorerLoading] = useState(false);
+
+  // Pie chart can get unreadable with many categories, so we cap it to a
+  // "Top N + Others" view by default and let the user widen it if they want.
+  const [pieTopN, setPieTopN] = useState(8);
 
   const uploadFile = async (redirectTab) => {
     if (!file) {
@@ -75,6 +95,12 @@ function App() {
       setChatHistory([
         { role: "assistant", text: `Successfully indexed ${response.data.filename}! Ask me any questions about these fields.` }
       ]);
+      // Reset Smart Data Explorer to page 1 for the newly loaded dataset
+      setCurrentPage(1);
+      setSearchTerm("");
+      setDebouncedSearch("");
+      setSortColumnState("");
+      setSortOrder("asc");
       if (redirectTab) setActiveTab(redirectTab);
     } catch (error) {
       console.error(error);
@@ -99,6 +125,74 @@ function App() {
     setChatHistory([
       { role: "assistant", text: "Data cleared. Upload a new file whenever you're ready." }
     ]);
+    // Reset Smart Data Explorer too
+    setCurrentPage(1);
+    setSearchTerm("");
+    setDebouncedSearch("");
+    setSortColumnState("");
+    setSortOrder("asc");
+    setExplorerRows([]);
+    setExplorerTotalRows(0);
+    setExplorerTotalPages(1);
+  };
+
+  // Fetches one page of rows from the backend instead of loading the whole dataset
+  const fetchExplorerData = async () => {
+    setExplorerLoading(true);
+    try {
+      const response = await axios.get("http://127.0.0.1:8000/data", {
+        params: {
+          page: currentPage,
+          limit: rowsPerPage,
+          search: debouncedSearch,
+          sort: sortColumn,
+          order: sortOrder
+        }
+      });
+      setExplorerRows(response.data.rows || []);
+      setExplorerTotalRows(response.data.total_rows || 0);
+      setExplorerTotalPages(response.data.total_pages || 1);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setExplorerLoading(false);
+    }
+  };
+
+  // Debounce the search box so we don't hit the backend on every keystroke
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setCurrentPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Re-fetch whenever page, page size, sorting, or the debounced search changes
+  useEffect(() => {
+    if (data) {
+      fetchExplorerData();
+    } else {
+      setExplorerRows([]);
+      setExplorerTotalRows(0);
+      setExplorerTotalPages(1);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, rowsPerPage, sortColumn, sortOrder, debouncedSearch, data]);
+
+  const handleSort = (col) => {
+    if (sortColumn === col) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortColumnState(col);
+      setSortOrder("asc");
+    }
+    setCurrentPage(1);
+  };
+
+  const handleRowsPerPageChange = (value) => {
+    setRowsPerPage(Number(value));
+    setCurrentPage(1);
   };
 
   const navigate = useNavigate();
@@ -191,6 +285,22 @@ function App() {
       {icon}
     </div>
   );
+
+  // Sort categories by value and collapse the long tail into "Others" so the
+  // pie chart stays readable even when the grouped field has 50-100+ values
+  const pieChartData = useMemo(() => {
+    if (!data?.chart_data || !data.y_key || !data.x_key) return [];
+    const sorted = [...data.chart_data].sort(
+      (a, b) => (Number(b[data.y_key]) || 0) - (Number(a[data.y_key]) || 0)
+    );
+    if (pieTopN === "all" || sorted.length <= pieTopN) return sorted;
+
+    const top = sorted.slice(0, pieTopN);
+    const rest = sorted.slice(pieTopN);
+    const othersTotal = rest.reduce((sum, item) => sum + (Number(item[data.y_key]) || 0), 0);
+
+    return [...top, { [data.x_key]: `Others (${rest.length})`, [data.y_key]: othersTotal }];
+  }, [data, pieTopN]);
 
   return (
     <div
@@ -669,21 +779,72 @@ function App() {
 
                     {/* PIE CHART */}
                     <div className={`p-6 rounded-2xl shadow-sm border ${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-100"}`}>
-                      <h3 className="text-xl font-bold mb-4">Category Composition Matrix</h3>
-                      <div className="w-full h-72">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                        <div>
+                          <h3 className="text-xl font-bold">Category Composition Matrix</h3>
+                          <p className={`text-sm mt-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                            {pieTopN === "all" || data.chart_data.length <= pieTopN
+                              ? `All ${data.chart_data.length} categories by ${data.y_key}`
+                              : `Top ${pieTopN} of ${data.chart_data.length} categories by ${data.y_key}`}
+                          </p>
+                        </div>
+
+                        <select
+                          value={pieTopN}
+                          onChange={(e) => setPieTopN(e.target.value === "all" ? "all" : Number(e.target.value))}
+                          className={`rounded-xl px-3 py-2 text-sm font-medium border focus:outline-none focus:ring-2 focus:ring-indigo-500 transition ${
+                            darkMode ? "bg-gray-900 border-gray-600 text-white" : "bg-white border-gray-200 text-gray-900"
+                          }`}
+                        >
+                          <option value={5}>Top 5</option>
+                          <option value={8}>Top 8</option>
+                          <option value={10}>Top 10</option>
+                          <option value={15}>Top 15</option>
+                          <option value="all">Show all ({data.chart_data.length})</option>
+                        </select>
+                      </div>
+
+                      <div className="w-full h-80">
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
-                            <Pie data={data.chart_data} dataKey={data.y_key} nameKey={data.x_key} outerRadius={100} label>
-                              {data.chart_data.map((entry, index) => {
-                                const sliceColors = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#14b8a6"];
-                                return <Cell key={`cell-${index}`} fill={sliceColors[index % sliceColors.length]} />;
+                            <Pie
+                              data={pieChartData}
+                              dataKey={data.y_key}
+                              nameKey={data.x_key}
+                              innerRadius={60}
+                              outerRadius={110}
+                              paddingAngle={2}
+                              label={({ percent }) => (percent > 0.04 ? `${(percent * 100).toFixed(0)}%` : "")}
+                            >
+                              {pieChartData.map((entry, index) => {
+                                const isOthers = String(entry[data.x_key]).startsWith("Others");
+                                return (
+                                  <Cell
+                                    key={`cell-${index}`}
+                                    fill={isOthers ? OTHERS_COLOR : PIE_COLORS[index % PIE_COLORS.length]}
+                                    stroke={darkMode ? "#1f2937" : "#ffffff"}
+                                    strokeWidth={2}
+                                  />
+                                );
                               })}
                             </Pie>
                             <Tooltip contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }} />
-                            <Legend iconType="circle" layout="horizontal" verticalAlign="bottom" align="center" />
+                            <Legend
+                              iconType="circle"
+                              layout="horizontal"
+                              verticalAlign="bottom"
+                              align="center"
+                              wrapperStyle={{ fontSize: "12px", lineHeight: "1.6" }}
+                            />
                           </PieChart>
                         </ResponsiveContainer>
                       </div>
+
+                      {pieTopN !== "all" && data.chart_data.length > pieTopN && (
+                        <p className={`text-xs mt-3 ${darkMode ? "text-gray-500" : "text-gray-400"}`}>
+                          💡 The remaining {data.chart_data.length - pieTopN} categories are grouped into "Others". Pick "Show all" above to break them out individually.
+                        </p>
+                      )}
                     </div>
 
                     {/* LINE CHART */}
@@ -815,34 +976,142 @@ function App() {
                   </div>
                 </div>
 
-                {/* Structured Data Explorer Table */}
+                {/* Smart Data Explorer */}
                 <div className={`rounded-2xl shadow-sm border overflow-hidden ${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-100"}`}>
-                  <div className={`p-6 border-b ${darkMode ? "border-gray-700" : "border-gray-100"}`}>
-                    <h3 className="text-xl font-bold">Structured Data Explorer</h3>
+                  <div className={`p-6 border-b flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 ${darkMode ? "border-gray-700" : "border-gray-100"}`}>
+                    <div>
+                      <h3 className="text-xl font-bold">Smart Data Explorer</h3>
+                      <p className={`text-xs mt-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                        Search, sort, and page through the full dataset without loading it all at once.
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm opacity-60 pointer-events-none">🔍</span>
+                        <input
+                          type="text"
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          placeholder="Search rows..."
+                          className={`pl-9 pr-3 py-2 rounded-xl text-sm w-full sm:w-56 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition ${
+                            darkMode
+                              ? "bg-gray-900 border border-gray-600 text-white placeholder-gray-500"
+                              : "bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400"
+                          }`}
+                        />
+                      </div>
+
+                      <select
+                        value={rowsPerPage}
+                        onChange={(e) => handleRowsPerPageChange(e.target.value)}
+                        className={`rounded-xl px-3 py-2 text-sm font-medium border focus:outline-none focus:ring-2 focus:ring-indigo-500 transition ${
+                          darkMode ? "bg-gray-900 border-gray-600 text-white" : "bg-white border-gray-200 text-gray-900"
+                        }`}
+                      >
+                        <option value={10}>10 / page</option>
+                        <option value={20}>20 / page</option>
+                        <option value={50}>50 / page</option>
+                        <option value={100}>100 / page</option>
+                      </select>
+                    </div>
                   </div>
-                  <div className="overflow-x-auto">
+
+                  <div className="relative overflow-x-auto min-h-[200px]">
+                    {explorerLoading && (
+                      <div className={`absolute inset-0 flex items-center justify-center z-10 backdrop-blur-sm ${darkMode ? "bg-gray-800/70" : "bg-white/70"}`}>
+                        <span className={`text-sm font-medium animate-pulse ${darkMode ? "text-gray-300" : "text-gray-500"}`}>
+                          ⏳ Loading rows…
+                        </span>
+                      </div>
+                    )}
+
                     <table className="w-full text-left border-collapse">
                       <thead>
                         <tr className={darkMode ? "bg-gray-900 border-b border-gray-700" : "bg-gray-50 border-b border-gray-100"}>
                           {data.columns.map((col, index) => (
-                            <th key={index} className="text-xs uppercase font-semibold text-gray-400 tracking-wider px-6 py-4">
-                              {col}
+                            <th
+                              key={index}
+                              onClick={() => handleSort(col)}
+                              className={`text-xs uppercase font-semibold tracking-wider px-6 py-4 cursor-pointer select-none transition ${
+                                sortColumn === col
+                                  ? "text-indigo-500"
+                                  : darkMode
+                                  ? "text-gray-400 hover:text-indigo-400"
+                                  : "text-gray-500 hover:text-indigo-500"
+                              }`}
+                            >
+                              <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                                {col}
+                                {sortColumn === col && (sortOrder === "asc" ? "▲" : "▼")}
+                              </span>
                             </th>
                           ))}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-700/20">
-                        {data.preview.map((row, index) => (
+                        {explorerRows.map((row, index) => (
                           <tr key={index} className={darkMode ? "hover:bg-gray-700/40 transition" : "hover:bg-gray-50/50 transition"}>
                             {data.columns.map((col, i) => (
-                              <td key={i} className="px-6 py-4 text-sm font-medium">
+                              <td key={i} className="px-6 py-4 text-sm font-medium whitespace-nowrap">
                                 {row[col] !== null && row[col] !== undefined ? row[col].toString() : "—"}
                               </td>
                             ))}
                           </tr>
                         ))}
+
+                        {!explorerLoading && explorerRows.length === 0 && (
+                          <tr>
+                            <td
+                              colSpan={data.columns.length}
+                              className={`px-6 py-12 text-center text-sm ${darkMode ? "text-gray-500" : "text-gray-400"}`}
+                            >
+                              No matching rows found.
+                            </td>
+                          </tr>
+                        )}
                       </tbody>
                     </table>
+                  </div>
+
+                  {/* Pagination footer */}
+                  <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-6 py-4 border-t text-sm ${darkMode ? "border-gray-700 text-gray-400" : "border-gray-100 text-gray-500"}`}>
+                    <p>
+                      Showing{" "}
+                      <span className={`font-semibold ${darkMode ? "text-gray-200" : "text-gray-700"}`}>
+                        {explorerTotalRows === 0 ? 0 : (currentPage - 1) * rowsPerPage + 1}
+                        {"–"}
+                        {Math.min(currentPage * rowsPerPage, explorerTotalRows)}
+                      </span>{" "}
+                      of{" "}
+                      <span className={`font-semibold ${darkMode ? "text-gray-200" : "text-gray-700"}`}>{explorerTotalRows}</span> rows
+                    </p>
+
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                        disabled={currentPage <= 1}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition disabled:opacity-40 disabled:cursor-not-allowed ${
+                          darkMode ? "bg-gray-700 hover:bg-gray-600 text-white" : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+                        }`}
+                      >
+                        ← Prev
+                      </button>
+
+                      <span className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${darkMode ? "bg-gray-900 text-gray-200" : "bg-white border border-gray-200 text-gray-700"}`}>
+                        Page {currentPage} of {explorerTotalPages}
+                      </span>
+
+                      <button
+                        onClick={() => setCurrentPage((p) => Math.min(explorerTotalPages, p + 1))}
+                        disabled={currentPage >= explorerTotalPages}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition disabled:opacity-40 disabled:cursor-not-allowed ${
+                          darkMode ? "bg-gray-700 hover:bg-gray-600 text-white" : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+                        }`}
+                      >
+                        Next →
+                      </button>
+                    </div>
                   </div>
                 </div>
               </>
