@@ -40,6 +40,10 @@ app.add_middleware(
 # Global memory storage to hold the dataset structure temporarily for chat queries
 storage = collections.defaultdict(dict)
 
+# Raw uploaded files are kept here so Dataset History can reopen them later
+UPLOADS_DIR = "uploads"
+os.makedirs(UPLOADS_DIR, exist_ok=True)
+
 
 def human_readable_size(num_bytes: int) -> str:
     size = float(num_bytes)
@@ -77,40 +81,12 @@ def recent_uploads():
     db.close()
 
     return result
-# ✅ 1. FILE UPLOAD ENDPOINT (Yeh missing tha aapki file mein!)
-@app.post("/upload")
-async def upload_file(
-    file: UploadFile = File(...),
-    x_axis: str = Form(None),
-    y_axis: str = Form(None),
-    aggregation: str = Form("sum")
-):
-    start_time = time.time()
-    filename_lower = file.filename.lower()
-
-    try:
-        if filename_lower.endswith(".csv") or filename_lower.endswith(".txt"):
-            df = pd.read_csv(file.file)
-        elif filename_lower.endswith(".xlsx") or filename_lower.endswith(".xls"):
-            df = pd.read_excel(file.file)
-        else:
-            try:
-                df = pd.read_csv(file.file)
-            except Exception:
-                df = pd.read_excel(file.file)
-
-    except Exception as e:
-        return {"error": f"Failed to parse file structure: {str(e)}"}
-
-    # File size (works regardless of how much of the stream pandas already consumed)
-    try:
-        file.file.seek(0, os.SEEK_END)
-        file_size_bytes = file.file.tell()
-        file.file.seek(0)
-    except Exception:
-        file_size_bytes = 0
-    file_size_display = human_readable_size(file_size_bytes)
-
+def build_dataset_payload(df, filename, x_axis, y_axis, aggregation, file_size_display, start_time):
+    """Runs the full analytics pipeline (KPIs, chart grouping, correlation,
+    forecast, storage) on an already-loaded dataframe and returns the same
+    payload shape the frontend expects from /upload. Shared by /upload
+    (fresh file) and /datasets/{id}/reopen (re-reading a saved file), so
+    both paths produce identical dashboards."""
     df = df.replace({np.nan: None})
     df.columns = df.columns.str.strip()
     columns = list(df.columns)
@@ -290,7 +266,7 @@ async def upload_file(
          "trend_info": trend_info,
 
          # Metadata used by the PDF/CSV export endpoints
-         "filename": file.filename,
+         "filename": filename,
          "upload_time": datetime.now().strftime("%d %b %Y, %I:%M %p"),
          "file_size": file_size_display,
          "processing_time": f"{processing_time_seconds}s"
@@ -301,20 +277,12 @@ async def upload_file(
     print("X Axis:", x_axis)
     print("Y Axis:", y_axis)
     print("Chart Data:", chart_data)
-    db = SessionLocal()
 
-    new_file = UploadedFile(
-       filename=file.filename,
-       total_rows=total_rows,
-       total_columns=len(columns)
-    )
-    db.add(new_file)
-    db.commit()
-    db.refresh(new_file)
-
-    db.close()
+    # NOTE: no DB write here on purpose. This function is shared by /upload
+    # (which creates exactly one history row) and /datasets/{id}/reopen
+    # (which must NOT create a new history row for an already-saved dataset).
     return {
-        "filename": file.filename,
+        "filename": filename,
         "columns": columns,
         "total_rows": total_rows,
         "preview": preview_data,
@@ -330,6 +298,186 @@ async def upload_file(
         "forecast_data": forecast_data,
         "trend_info": trend_info
     }
+
+
+# ✅ 1. FILE UPLOAD ENDPOINT
+@app.post("/upload")
+async def upload_file(
+    file: UploadFile = File(...),
+    x_axis: str = Form(None),
+    y_axis: str = Form(None),
+    aggregation: str = Form("sum")
+):
+    start_time = time.time()
+    filename_lower = file.filename.lower()
+
+    try:
+        if filename_lower.endswith(".csv") or filename_lower.endswith(".txt"):
+            df = pd.read_csv(file.file)
+        elif filename_lower.endswith(".xlsx") or filename_lower.endswith(".xls"):
+            df = pd.read_excel(file.file)
+        else:
+            try:
+                df = pd.read_csv(file.file)
+            except Exception:
+                df = pd.read_excel(file.file)
+
+    except Exception as e:
+        return {"error": f"Failed to parse file structure: {str(e)}"}
+
+    # File size (works regardless of how much of the stream pandas already consumed)
+    try:
+        file.file.seek(0, os.SEEK_END)
+        file_size_bytes = file.file.tell()
+        file.file.seek(0)
+    except Exception:
+        file_size_bytes = 0
+    file_size_display = human_readable_size(file_size_bytes)
+
+    # Persist the raw file to disk so it can be reopened later from Dataset
+    # History without asking the user to upload it again.
+    saved_path = None
+    try:
+        unique_name = f"{int(start_time * 1000)}_{file.filename}"
+        saved_path = os.path.join(UPLOADS_DIR, unique_name)
+        with open(saved_path, "wb") as out:
+            file.file.seek(0)
+            out.write(file.file.read())
+            file.file.seek(0)
+    except Exception as e:
+        print("Warning: could not persist uploaded file to disk:", e)
+        saved_path = None
+
+    result = build_dataset_payload(df, file.filename, x_axis, y_axis, aggregation, file_size_display, start_time)
+
+    db = SessionLocal()
+    new_file = UploadedFile(
+       filename=file.filename,
+       total_rows=result["total_rows"],
+       total_columns=len(result["columns"]),
+       file_size=file_size_display,
+       status="Processed",
+       file_path=saved_path
+    )
+    db.add(new_file)
+    db.commit()
+    db.refresh(new_file)
+    db.close()
+
+    return result
+
+
+# ==========================================================
+# DATASET HISTORY — list / search / reopen / delete previously
+# uploaded datasets, backed by the uploaded_files table + the
+# raw files kept on disk in UPLOADS_DIR.
+# ==========================================================
+@app.get("/datasets")
+def list_datasets(
+    search: str = Query("", description="Filter by filename"),
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=100)
+):
+    db = SessionLocal()
+    query = db.query(UploadedFile)
+
+    if search:
+        query = query.filter(UploadedFile.filename.ilike(f"%{search.strip()}%"))
+
+    total = query.count()
+    total_pages = max(1, math.ceil(total / limit))
+    safe_page = min(max(page, 1), total_pages)
+
+    items = (
+        query.order_by(UploadedFile.created_at.desc())
+        .offset((safe_page - 1) * limit)
+        .limit(limit)
+        .all()
+    )
+    db.close()
+
+    return {
+        "page": safe_page,
+        "total_pages": total_pages,
+        "total": total,
+        "datasets": [
+            {
+                "id": item.id,
+                "filename": item.filename,
+                "total_rows": item.total_rows,
+                "total_columns": item.total_columns,
+                "file_size": item.file_size or "—",
+                "status": item.status or "Processed",
+                "created_at": item.created_at,
+                "can_reopen": bool(item.file_path and os.path.exists(item.file_path))
+            }
+            for item in items
+        ]
+    }
+
+
+@app.delete("/datasets/{dataset_id}")
+def delete_dataset(dataset_id: int):
+    db = SessionLocal()
+    row = db.query(UploadedFile).filter(UploadedFile.id == dataset_id).first()
+
+    if not row:
+        db.close()
+        return {"error": "Dataset not found"}
+
+    file_path = row.file_path
+    db.delete(row)
+    db.commit()
+    db.close()
+
+    if file_path and os.path.exists(file_path):
+        try:
+            os.remove(file_path)
+        except Exception as e:
+            print("Warning: could not delete file from disk:", e)
+
+    return {"success": True, "deleted_id": dataset_id}
+
+
+@app.post("/datasets/{dataset_id}/reopen")
+def reopen_dataset(
+    dataset_id: int,
+    x_axis: str = Query(None),
+    y_axis: str = Query(None),
+    aggregation: str = Query("sum")
+):
+    start_time = time.time()
+
+    db = SessionLocal()
+    row = db.query(UploadedFile).filter(UploadedFile.id == dataset_id).first()
+    db.close()
+
+    if not row:
+        return {"error": "Dataset not found"}
+
+    if not row.file_path or not os.path.exists(row.file_path):
+        return {"error": "The original file for this dataset is no longer available on the server."}
+
+    filename_lower = row.filename.lower()
+    try:
+        if filename_lower.endswith(".csv") or filename_lower.endswith(".txt"):
+            df = pd.read_csv(row.file_path)
+        elif filename_lower.endswith(".xlsx") or filename_lower.endswith(".xls"):
+            df = pd.read_excel(row.file_path)
+        else:
+            try:
+                df = pd.read_csv(row.file_path)
+            except Exception:
+                df = pd.read_excel(row.file_path)
+    except Exception as e:
+        return {"error": f"Failed to reopen dataset: {str(e)}"}
+
+    file_size_display = row.file_size or human_readable_size(os.path.getsize(row.file_path))
+    result = build_dataset_payload(df, row.filename, x_axis, y_axis, aggregation, file_size_display, start_time)
+
+    return result
+
+
 
 
 def apply_filters(df, search="", sort="", order="asc", column="", value=""):

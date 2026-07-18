@@ -1,0 +1,11 @@
+Name,Score
+Rahul,85
+Priya,92
+Aman,78
+Sneha,88
+Vikram,95
+Neha,81
+Arjun,76
+Pooja,89
+Karan,84
+Anjali,91

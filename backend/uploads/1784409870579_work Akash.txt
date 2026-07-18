@@ -1,0 +1,11 @@
+Name,Age,Department,Salary,Experience
+Rahul,24,IT,45000,2
+Priya,29,HR,52000,5
+Aman,31,Finance,61000,7
+Sneha,26,Marketing,48000,3
+Vikram,35,IT,75000,10
+Neha,28,Sales,53000,4
+Arjun,30,Finance,67000,6
+Pooja,27,HR,50000,3
+Karan,32,Marketing,72000,8
+Anjali,25,Sales,46000,2

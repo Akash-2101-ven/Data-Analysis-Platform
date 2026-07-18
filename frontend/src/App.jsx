@@ -4,7 +4,7 @@ import { auth } from "./firebase";
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect, useMemo, useRef } from "react";
 import axios from "axios";
-import html2canvas from "html2canvas";
+import html2canvas from "html2canvas-pro";
 import {
   BarChart,
   Bar,
@@ -76,6 +76,17 @@ function App() {
   // Ref around the chart section so "Download PNG" can snapshot just the visuals
   const chartsRef = useRef(null);
   const [pngExporting, setPngExporting] = useState(false);
+
+  // Dataset History states — list/search/reopen/delete previous uploads
+  const [historyDatasets, setHistoryDatasets] = useState([]);
+  const [historyTotal, setHistoryTotal] = useState(0);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyTotalPages, setHistoryTotalPages] = useState(1);
+  const [historySearch, setHistorySearch] = useState("");
+  const [historyDebouncedSearch, setHistoryDebouncedSearch] = useState("");
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [reopeningId, setReopeningId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
 
   const uploadFile = async (redirectTab) => {
     if (!file) {
@@ -207,6 +218,92 @@ function App() {
   const handleRowsPerPageChange = (value) => {
     setRowsPerPage(Number(value));
     setCurrentPage(1);
+  };
+
+  // ---- Dataset History ----
+  const fetchHistory = async () => {
+    setHistoryLoading(true);
+    try {
+      const response = await axios.get("http://127.0.0.1:8000/datasets", {
+        params: { page: historyPage, limit: 8, search: historyDebouncedSearch }
+      });
+      setHistoryDatasets(response.data.datasets || []);
+      setHistoryTotal(response.data.total || 0);
+      setHistoryTotalPages(response.data.total_pages || 1);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  // Debounce the history search box just like the Data Explorer
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setHistoryDebouncedSearch(historySearch);
+      setHistoryPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [historySearch]);
+
+  useEffect(() => {
+    fetchHistory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [historyPage, historyDebouncedSearch]);
+
+  // Re-loads a past dataset from disk on the backend and swaps it in as the
+  // active dataset — exactly like a fresh upload, minus re-selecting the file.
+  const reopenDataset = async (id) => {
+    setReopeningId(id);
+    try {
+      const response = await axios.post(`http://127.0.0.1:8000/datasets/${id}/reopen`);
+      if (response.data?.error) {
+        alert(response.data.error);
+        return;
+      }
+      setData(response.data);
+      setDashboardStats({
+        totalRows: response.data.total_rows,
+        totalColumns: response.data.columns.length,
+        totalCharts: response.data.chart_data.length,
+        totalUploads: recentUploads.length
+      });
+      setSelectedX(response.data.x_key);
+      setSelectedY(response.data.y_key);
+      setChatHistory([
+        { role: "assistant", text: `Reopened ${response.data.filename}! Ask me any questions about these fields.` }
+      ]);
+      setCurrentPage(1);
+      setSearchTerm("");
+      setDebouncedSearch("");
+      setSortColumnState("");
+      setSortOrder("asc");
+      setDrillCategory(null);
+      setDrillRows([]);
+      setActiveTab("dashboard");
+    } catch (error) {
+      console.error(error);
+      alert("Couldn't reopen this dataset.");
+    } finally {
+      setReopeningId(null);
+    }
+  };
+
+  const deleteHistoryDataset = async (id) => {
+    if (!window.confirm("Delete this dataset from history? The original file will be removed and this can't be undone.")) {
+      return;
+    }
+    setDeletingId(id);
+    try {
+      await axios.delete(`http://127.0.0.1:8000/datasets/${id}`);
+      fetchHistory();
+      axios.get("http://127.0.0.1:8000/recent-uploads").then((res) => setRecentUploads(res.data)).catch(() => {});
+    } catch (error) {
+      console.error(error);
+      alert("Couldn't delete this dataset.");
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const navigate = useNavigate();
@@ -350,21 +447,25 @@ function App() {
 
   // PNG export: snapshots the chart section exactly as rendered on screen
   const handleDownloadPng = async () => {
-    if (!chartsRef.current) return;
+    if (!chartsRef.current) {
+      alert("Nothing to export yet — make sure charts are visible on screen first.");
+      return;
+    }
     setPngExporting(true);
     try {
       const canvas = await html2canvas(chartsRef.current, {
         backgroundColor: darkMode ? "#111827" : "#ffffff",
         scale: 2,
-        useCORS: true
+        useCORS: true,
+        logging: false
       });
       const link = document.createElement("a");
       link.download = `dashboard-visuals-${Date.now()}.png`;
       link.href = canvas.toDataURL("image/png");
       link.click();
     } catch (error) {
-      console.error(error);
-      alert("Couldn't generate PNG — please try again.");
+      console.error("PNG export failed:", error);
+      alert(`Couldn't generate PNG: ${error?.message || "unknown error"}. Check the browser console for details.`);
     } finally {
       setPngExporting(false);
     }
@@ -434,6 +535,7 @@ function App() {
           <NavItem id="visualizations" label="Visualizations" icon="📈" />
           <NavItem id="ai" label="AI Assistant" icon="🤖" />
           <NavItem id="explorer" label="Explorer" icon="🔍" />
+          <NavItem id="history" label="Dataset History" icon="🕒" />
         </div>
 
         <div className="space-y-2 pt-4 mt-4 border-t border-dashed border-gray-500/20">
@@ -528,10 +630,18 @@ function App() {
                 darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
               }`}
             >
-              <button onClick={() => setShowUploads(!showUploads)} className="w-full flex justify-between items-center">
-                <h2 className="text-xl font-bold">📂 Recent Uploads</h2>
-                <span className="text-2xl">{showUploads ? "▲" : "▼"}</span>
-              </button>
+              <div className="flex items-center justify-between gap-3">
+                <button onClick={() => setShowUploads(!showUploads)} className="flex-1 flex justify-between items-center">
+                  <h2 className="text-xl font-bold">📂 Recent Uploads</h2>
+                  <span className="text-2xl mr-3">{showUploads ? "▲" : "▼"}</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab("history")}
+                  className="text-xs font-semibold text-indigo-500 hover:text-indigo-400 transition whitespace-nowrap"
+                >
+                  View all →
+                </button>
+              </div>
 
               {showUploads && (
                 <div className="mt-5">
@@ -1369,6 +1479,174 @@ function App() {
                 </div>
               </>
             )}
+          </div>
+        )}
+
+        {/* ================= DATASET HISTORY TAB ================= */}
+        {activeTab === "history" && (
+          <div key="history" className="tab-fade max-w-7xl mx-auto space-y-6">
+            <div className="flex items-center gap-4">
+              <PageIcon icon="🕒" />
+              <div>
+                <h1 className={`text-3xl font-extrabold ${darkMode ? "text-white" : "text-gray-900"}`}>
+                  Dataset History
+                </h1>
+                <p className={`text-sm mt-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                  Every dataset you've uploaded, searchable and ready to reopen anytime.
+                </p>
+              </div>
+            </div>
+
+            <div className={`rounded-2xl shadow-sm border overflow-hidden ${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-100"}`}>
+              <div className={`p-6 border-b flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 ${darkMode ? "border-gray-700" : "border-gray-100"}`}>
+                <div>
+                  <h3 className="text-lg font-bold">All Uploads</h3>
+                  <p className={`text-xs mt-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                    {historyTotal} dataset{historyTotal === 1 ? "" : "s"} total
+                  </p>
+                </div>
+
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm opacity-60 pointer-events-none">🔍</span>
+                  <input
+                    type="text"
+                    value={historySearch}
+                    onChange={(e) => setHistorySearch(e.target.value)}
+                    placeholder="Search datasets..."
+                    className={`pl-9 pr-3 py-2 rounded-xl text-sm w-full sm:w-64 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition ${
+                      darkMode
+                        ? "bg-gray-900 border border-gray-600 text-white placeholder-gray-500"
+                        : "bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400"
+                    }`}
+                  />
+                </div>
+              </div>
+
+              <div className="relative overflow-x-auto min-h-[200px]">
+                {historyLoading && (
+                  <div className={`absolute inset-0 flex items-center justify-center z-10 backdrop-blur-sm ${darkMode ? "bg-gray-800/70" : "bg-white/70"}`}>
+                    <span className={`text-sm font-medium animate-pulse ${darkMode ? "text-gray-300" : "text-gray-500"}`}>
+                      ⏳ Loading history…
+                    </span>
+                  </div>
+                )}
+
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className={darkMode ? "bg-gray-900 border-b border-gray-700" : "bg-gray-50 border-b border-gray-100"}>
+                      {["Dataset", "Uploaded", "Rows", "Columns", "Size", "Status", ""].map((h, i) => (
+                        <th
+                          key={i}
+                          className={`text-xs uppercase font-semibold tracking-wider px-6 py-4 whitespace-nowrap ${
+                            darkMode ? "text-gray-400" : "text-gray-500"
+                          }`}
+                        >
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-700/20">
+                    {historyDatasets.map((item) => (
+                      <tr key={item.id} className={darkMode ? "hover:bg-gray-700/40 transition" : "hover:bg-gray-50/50 transition"}>
+                        <td className="px-6 py-4 text-sm font-semibold whitespace-nowrap">📄 {item.filename}</td>
+                        <td className={`px-6 py-4 text-sm whitespace-nowrap ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                          {item.created_at
+                            ? new Date(item.created_at).toLocaleString(undefined, {
+                                day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit"
+                              })
+                            : "—"}
+                        </td>
+                        <td className="px-6 py-4 text-sm whitespace-nowrap">
+                          {typeof item.total_rows === "number" ? item.total_rows.toLocaleString() : item.total_rows}
+                        </td>
+                        <td className="px-6 py-4 text-sm whitespace-nowrap">{item.total_columns}</td>
+                        <td className={`px-6 py-4 text-sm whitespace-nowrap ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                          {item.file_size}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span
+                            className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+                              item.status === "Processed"
+                                ? darkMode ? "bg-emerald-500/10 text-emerald-400" : "bg-emerald-50 text-emerald-600"
+                                : darkMode ? "bg-amber-500/10 text-amber-400" : "bg-amber-50 text-amber-600"
+                            }`}
+                          >
+                            {item.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => reopenDataset(item.id)}
+                              disabled={!item.can_reopen || reopeningId === item.id}
+                              title={item.can_reopen ? "Reopen this dataset" : "Original file no longer on server"}
+                              className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 text-white transition disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                              {reopeningId === item.id ? "Opening…" : "Open"}
+                            </button>
+                            <button
+                              onClick={() => deleteHistoryDataset(item.id)}
+                              disabled={deletingId === item.id}
+                              title="Delete dataset"
+                              className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed ${
+                                darkMode ? "bg-rose-500/10 text-rose-400 hover:bg-rose-500/20" : "bg-rose-50 text-rose-600 hover:bg-rose-100"
+                              }`}
+                            >
+                              {deletingId === item.id ? "…" : "🗑️"}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+
+                    {!historyLoading && historyDatasets.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className={`px-6 py-12 text-center text-sm ${darkMode ? "text-gray-500" : "text-gray-400"}`}>
+                          {historyDebouncedSearch ? "No datasets match your search." : "No datasets uploaded yet — upload one from the Reports tab."}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination footer */}
+              <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-6 py-4 border-t text-sm ${darkMode ? "border-gray-700 text-gray-400" : "border-gray-100 text-gray-500"}`}>
+                <p>
+                  Showing{" "}
+                  <span className={`font-semibold ${darkMode ? "text-gray-200" : "text-gray-700"}`}>{historyDatasets.length}</span>{" "}
+                  of{" "}
+                  <span className={`font-semibold ${darkMode ? "text-gray-200" : "text-gray-700"}`}>{historyTotal}</span> datasets
+                </p>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
+                    disabled={historyPage <= 1}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition disabled:opacity-40 disabled:cursor-not-allowed ${
+                      darkMode ? "bg-gray-700 hover:bg-gray-600 text-white" : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+                    }`}
+                  >
+                    ← Prev
+                  </button>
+
+                  <span className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${darkMode ? "bg-gray-900 text-gray-200" : "bg-white border border-gray-200 text-gray-700"}`}>
+                    Page {historyPage} of {historyTotalPages}
+                  </span>
+
+                  <button
+                    onClick={() => setHistoryPage((p) => Math.min(historyTotalPages, p + 1))}
+                    disabled={historyPage >= historyTotalPages}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition disabled:opacity-40 disabled:cursor-not-allowed ${
+                      darkMode ? "bg-gray-700 hover:bg-gray-600 text-white" : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+                    }`}
+                  >
+                    Next →
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
